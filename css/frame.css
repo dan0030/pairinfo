@@ -18,6 +18,12 @@
   -webkit-font-smoothing: antialiased;
 }
 .pf-frame *, .pf-frame *::before, .pf-frame *::after { box-sizing: border-box; }
+.pf-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.pf-sheet { position: relative; z-index: 1; }
+.pf-frame.has-page { padding: var(--page-inset); }
+.pf-frame.has-page .pf-sheet { border: var(--page-bw) solid var(--page-color); border-radius: var(--page-radius); background: var(--page-fill); padding: var(--outer); }
+.pf-frame.no-block-border { --blk-bw: 0px; }
+.pf-frame.blocks-clear .pf-block { --blk-bg-default: transparent; }
 .pf-rows { position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--gap); }
 .pf-row { display: grid; gap: var(--gap); align-items: stretch; }
 .pf-row.align-center { align-items: center; }
@@ -33,8 +39,8 @@
 .pf-block {
   position: relative;
   min-width: 0;
-  background: var(--blk-bg, var(--c-card));
-  border: var(--bw) solid var(--blk-border, var(--c-border));
+  background: var(--blk-bg, var(--blk-bg-default, var(--c-card)));
+  border: var(--blk-bw, var(--bw)) solid var(--blk-border, var(--c-border));
   border-radius: var(--radius);
   padding: var(--blk-pad, var(--pad));
   color: var(--blk-text, var(--c-text));
@@ -255,3 +261,4 @@ body.is-dragging .pf-blk-tools { display: none !important; }
 .pf-col.target > .pf-empty-col { border-color: #3b5bfd; background: #eef1ff; }
 
 .pf-frame.exporting .pf-block, .pf-frame.exporting .pf-sticker { box-shadow: none !important; outline: none !important; }
+.pf-frame.blocks-clear .pf-tl-dot i { box-shadow: none; }

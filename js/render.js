@@ -36,8 +36,47 @@
     f.style.setProperty('--f-title', `${fam(s.fonts.title)}, 'Paperlogy', 'Pretendard', sans-serif`);
     f.style.setProperty('--f-body', `${fam(s.fonts.body)}, 'KoPubWorld Dotum', 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif`);
     f.style.width = s.width + 'px';
+    // 테두리 방식: block(블록마다) · page(페이지 전체) · both(둘 다) · none(없음)
+    const pg = s.page, mode = s.borderMode;
+    const hasPage = mode === 'page' || mode === 'both';
+    f.classList.toggle('has-page', hasPage);
+    f.classList.toggle('no-block-border', mode === 'page' || mode === 'none');
+    f.classList.toggle('blocks-clear', !!s.clearBlocks);
+    f.style.setProperty('--page-bw', pg.width + 'px');
+    f.style.setProperty('--page-color', pg.color || t.border);
+    f.style.setProperty('--page-radius', pg.radius + 'px');
+    f.style.setProperty('--page-inset', pg.inset + 'px');
+    f.style.setProperty('--page-fill', pg.fill === 'card' ? t.card : pg.fill === 'bg' ? t.bg : 'transparent');
   }
   PF.applyVars = applyVars;
+
+  /* 배경 레이어: 단색 · 그라데이션 · 이미지 */
+  function bgLayer() {
+    const bg = PF.project.settings.bg;
+    if (!bg || bg.type === 'solid') return null;
+    const el = h('div', { class: 'pf-bg' });
+    if (bg.type === 'gradient') {
+      const stops = [bg.g1, bg.g2].concat(bg.useG3 ? [bg.g3] : []).join(', ');
+      el.style.background = bg.kind === 'radial' ? `radial-gradient(circle at ${bg.pos || 'center'}, ${stops})` : `linear-gradient(${bg.angle}deg, ${stops})`;
+    } else if (bg.type === 'image') {
+      const src = bg.img && PF.assets[bg.img];
+      if (!src) return null;
+      Object.assign(el.style, {
+        backgroundImage: `url("${src}")`,
+        backgroundSize: bg.fit === 'tile' ? bg.tile + 'px auto' : bg.fit,
+        backgroundRepeat: bg.fit === 'tile' ? 'repeat' : 'no-repeat',
+        backgroundPosition: bg.pos || 'center',
+        opacity: bg.opacity,
+      });
+    }
+    return el;
+  }
+
+  PF.normalizeSettings = function (s) {
+    s.borderMode ||= 'block';
+    s.page = Object.assign({ width: 3, color: '', radius: 32, inset: 28, fill: 'none' }, s.page || {});
+    s.bg = Object.assign({ type: 'solid', kind: 'linear', angle: 160, g1: s.theme.bg, g2: s.theme.tagBg, g3: s.theme.card, useG3: false, pos: 'center', img: null, fit: 'cover', tile: 320, opacity: 1 }, s.bg || {});
+  };
 
   /* ---------- 이미지 칸 ---------- */
   PF.imgSlot = function (ref, set, o = {}) {
@@ -92,7 +131,7 @@
     const w = b.data.who === 'B' ? 'B' : 'A';
     const el = h('div', { class: `pf-block t-${b.type} st-${b.style} who-${w}` + (PF.ui.selected === b.id ? ' selected' : ''), 'data-id': b.id });
     if (b.bg) el.style.setProperty('--blk-bg', b.bg);
-    if (b.border) el.style.setProperty('--blk-border', b.border);
+    if (b.border) { el.style.setProperty('--blk-border', b.border); el.style.setProperty('--blk-bw', 'var(--bw)'); }
     if (b.color) el.style.setProperty('--blk-text', b.color);
     if (b.pad != null && b.pad !== '') el.style.setProperty('--blk-pad', b.pad + 'px');
     try {
@@ -119,7 +158,10 @@
     applyVars();
     f.classList.toggle('editing', !PF.ui.preview);
     f.replaceChildren();
+    const bgl = bgLayer();
+    if (bgl) f.append(bgl);
     f.append(PF.renderStickers(true));
+    const sheet = h('div', { class: 'pf-sheet' });
     const rows = h('div', { class: 'pf-rows' });
     p.rows.forEach((row, ri) => {
       const rEl = h('div', { class: 'pf-row' + (row.fill ? ' fill' : '') + (row.align ? ' align-' + row.align : ''), 'data-id': row.id, style: { gridTemplateColumns: row.cols.map((c) => `minmax(0, ${c.w}fr)`).join(' ') } });
@@ -134,7 +176,8 @@
       });
       rows.append(rEl);
     });
-    f.append(rows);
+    sheet.append(rows);
+    f.append(sheet);
     f.append(PF.renderStickers(false));
     if (!skipInspector) PF.renderInspector();
     PF.applyZoom();

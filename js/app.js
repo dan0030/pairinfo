@@ -9,6 +9,7 @@
     p.stickerLib ||= [];
     p.chars ||= { A: { name: '캐릭터 A', img: null }, B: { name: '캐릭터 B', img: null } };
     p.settings.fonts.custom ||= [];
+    PF.normalizeSettings(p.settings);
     if (PF.ui.selected && !PF.findBlock(PF.ui.selected)) PF.ui.selected = null;
     if (PF.ui.selSticker && !p.stickers.some((s) => s.id === PF.ui.selSticker)) PF.ui.selSticker = null;
     PF.applyCustomFonts();

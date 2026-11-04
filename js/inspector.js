@@ -218,14 +218,68 @@
         n.addEventListener('change', () => { s.width = PF.clamp(+n.value || 1200, 480, 4000); n.value = s.width; full(); });
         return h('div', { class: 'f-inline' }, n, h('span', { class: 'muted' }, 'px'), ...[1000, 1200, 1600, 2000].map((w) => h('button', { class: 'mini', onclick: () => { s.width = w; n.value = w; full(); } }, w)));
       })()),
-      row('바깥 여백', range(s, 'pad', 0, 160, 2, null, (v) => v + 'px')),
+      row(s.borderMode === 'page' || s.borderMode === 'both' ? '테두리 안 여백' : '바깥 여백', range(s, 'pad', 0, 160, 2, null, (v) => v + 'px')),
       row('블록 간격', range(s, 'gap', 0, 80, 1, null, (v) => v + 'px')),
       row('카드 안쪽 여백', range(s, 'cardPad', 0, 80, 1, () => {
         PF.project.rows.forEach((r) => r.cols.forEach((c) => c.blocks.forEach((b) => delete b.pad)));
         live();
       }, (v) => v + 'px')),
       row('모서리 둥글기', range(s, 'radius', 0, 60, 1, null, (v) => v + 'px')),
-      row('테두리 두께', range(s, 'borderWidth', 0, 8, 0.5, null, (v) => v + 'px'))));
+      row('블록 테두리', range(s, 'borderWidth', 0, 8, 0.5, null, (v) => v + 'px'))));
+
+    /* 테두리 방식 */
+    const redo = () => { full(); PF.renderDesign(); };
+    const pg = s.page, hasPage = s.borderMode === 'page' || s.borderMode === 'both';
+    const borderSec = section('테두리',
+      row('테두리 방식', select(s, 'borderMode', [['block', '블록마다 테두리'], ['page', '페이지 전체를 감싸기'], ['both', '둘 다'], ['none', '테두리 없음']], redo)),
+      check(s, 'clearBlocks', '블록 면 색 없애기 (배경이 비쳐 보이게)', redo));
+    if (hasPage)
+      borderSec.append(
+        row('두께', range(pg, 'width', 0.5, 16, 0.5, null, (v) => v + 'px')),
+        row('색', color(pg, 'color', null, true)),
+        row('둥글기', range(pg, 'radius', 0, 120, 1, null, (v) => v + 'px')),
+        row('바깥 간격', range(pg, 'inset', 0, 160, 2, null, (v) => v + 'px')),
+        row('안쪽 면', select(pg, 'fill', [['none', '비움 (배경 그대로)'], ['card', '카드 면 색'], ['bg', '바탕 색']])),
+        h('p', { class: 'hint' }, '“바깥 간격”은 페이지 끝에서 테두리까지, “테두리 안 여백”(위 크기 · 모양)은 테두리에서 블록까지의 거리예요.'));
+    box.append(borderSec);
+
+    /* 배경 */
+    const bg = s.bg;
+    const bgSec = section('배경', row('종류', select(bg, 'type', [['solid', '단색 (바탕 색)'], ['gradient', '그라데이션'], ['image', '이미지']], redo)));
+    const POS = [['center', '가운데'], ['top', '위'], ['bottom', '아래'], ['left', '왼쪽'], ['right', '오른쪽'], ['top left', '왼쪽 위'], ['top right', '오른쪽 위'], ['bottom left', '왼쪽 아래'], ['bottom right', '오른쪽 아래']];
+    if (bg.type === 'solid') bgSec.append(h('p', { class: 'hint' }, '“색 직접 고르기”의 바탕 색이 쓰여요.'));
+    if (bg.type === 'gradient') {
+      bgSec.append(
+        row('모양', select(bg, 'kind', [['linear', '직선'], ['radial', '원형']], redo)),
+        row('색 1', color(bg, 'g1')),
+        row('색 2', color(bg, 'g2')),
+        check(bg, 'useG3', '색 하나 더 쓰기', redo));
+      if (bg.useG3) bgSec.append(row('색 3', color(bg, 'g3')));
+      bgSec.append(bg.kind === 'radial' ? row('중심', select(bg, 'pos', POS)) : row('각도', range(bg, 'angle', 0, 360, 1, null, (v) => v + '°')));
+      bgSec.append(h('div', { class: 'btns' }, btn('색 1 ↔ 색 2', () => { [bg.g1, bg.g2] = [bg.g2, bg.g1]; redo(); }), btn('테마 색으로', () => { Object.assign(bg, { g1: t.bg, g2: t.tagBg, g3: t.card }); redo(); })));
+    }
+    if (bg.type === 'image') {
+      const has = bg.img && PF.assets[bg.img];
+      bgSec.append(
+        h('div', { class: 'img-ctl-top' },
+          h('div', { class: 'img-thumb' + (has ? '' : ' empty') }, has ? h('img', { src: PF.assets[bg.img], alt: '' }) : '없음'),
+          h('div', { class: 'btns' },
+            btn(has ? '교체' : '이미지 올리기', async () => {
+              const [f] = await PF.pickFile('image/*');
+              if (!f) return;
+              bg.img = await PF.addImageFile(f, 3200);
+              redo();
+            }),
+            has ? btn('삭제', () => { bg.img = null; redo(); }, 'danger') : null)));
+      if (has)
+        bgSec.append(
+          row('채우기', select(bg, 'fit', [['cover', '꽉 채우기'], ['contain', '전체 보이기'], ['tile', '바둑판 반복']], redo)),
+          bg.fit === 'tile' ? row('반복 크기', range(bg, 'tile', 40, 1600, 10, null, (v) => v + 'px')) : null,
+          row('위치', select(bg, 'pos', POS)),
+          row('진하기', range(bg, 'opacity', 0.05, 1, 0.05, null, (v) => Math.round(v * 100) + '%')),
+          h('p', { class: 'hint' }, '진하기를 낮추면 “바탕 색”이 비쳐서 이미지가 연해져요.'));
+    }
+    box.append(bgSec);
 
     const fonts = PF.fontList().map((f) => [f.family, f.label]);
     const fontsSec = section('글꼴',
