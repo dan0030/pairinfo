@@ -272,3 +272,10 @@ body.is-dragging .pf-blk-tools { display: none !important; }
 .pf-frame.editing .pf-avatar.has-alt:hover { outline: 2px dashed color-mix(in srgb, var(--acc) 45%, transparent); outline-offset: 3px; }
 .pf-frame:not(.editing) .edit-only { display: none !important; }
 .pf-frame.editing .pf-avatar.edit-only { opacity: .45; }
+
+/* 캐릭터 프로필: 키워드 색 (모양 → 직접 고른 색이 있으면 그것이 우선) */
+.pf-char.tags-tint { --tag-bg-d: color-mix(in srgb, var(--acc) 14%, var(--c-card)); --tag-text-d: var(--acc); }
+.pf-char.tags-solid { --tag-bg-d: var(--acc); --tag-text-d: #fff; }
+.pf-char.tags-line { --tag-bg-d: transparent; --tag-text-d: var(--acc); }
+.pf-char.tags-line .pf-tag { box-shadow: inset 0 0 0 1.5px var(--tag-text, var(--acc)); }
+.pf-char .pf-tag { background: var(--tag-bg, var(--tag-bg-d, var(--c-tag))); color: var(--tag-text, var(--tag-text-d, var(--c-tagtext))); }

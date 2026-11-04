@@ -86,12 +86,17 @@
       { key: 'showTags', label: '프로필 키워드', type: 'check' },
       { key: 'showProfile', label: '간략 프로필 글', type: 'check' },
       { key: 'showFields', label: '항목 표 (소속/상징 등)', type: 'check' },
+      { key: 'tagStyle', label: '키워드 모양', type: 'select', choices: [['default', '기본 (테마 태그 색)'], ['tint', '연한 캐릭터 색'], ['solid', '캐릭터 색 면'], ['line', '캐릭터 색 테두리']] },
+      { key: 'tagBg', label: '키워드 배경', type: 'color' },
+      { key: 'tagText', label: '키워드 글자', type: 'color' },
     ],
     list: { key: 'fields', label: '항목 표', make: () => ({ k: '항목', v: '' }), title: (it) => it.k },
     images: (b) => [{ label: '캐릭터 ' + who(b.data.who) + ' 두상', get: () => chars()[who(b.data.who)].img, set: (r) => (chars()[who(b.data.who)].img = r) }],
     render(b) {
       const d = b.data, w = who(d.who);
-      const el = h('div', { class: 'pf-char who-' + w });
+      const el = h('div', { class: 'pf-char who-' + w + ' tags-' + (d.tagStyle || 'default') });
+      if (d.tagBg) el.style.setProperty('--tag-bg', d.tagBg);
+      if (d.tagText) el.style.setProperty('--tag-text', d.tagText);
       if (d.showImg) el.append(PF.imgSlot(chars()[w].img, (r) => (chars()[w].img = r), { cls: 'pf-char-img', ratio: d.ratio, ph: '두상 이미지' }));
       el.append(ed(d, 'label', { cls: 'pf-label acc', ph: 'CHARACTER' }), charName(w, 'pf-name'));
       if (d.showTags) el.append(tagList(d.tags, { cls: 'pill' }));

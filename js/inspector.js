@@ -146,6 +146,7 @@
 
     const opts = (def.options || []).map((o) =>
       o.type === 'check' ? check(b.data, o.key, o.label)
+        : o.type === 'color' ? row(o.label, color(b.data, o.key, null, true))
         : o.type === 'select' ? row(o.label, select(b.data, o.key, o.choices))
           : row(o.label, range(b.data, o.key, o.min, o.max, o.step)));
     if (opts.length) box.append(section('블록 옵션', ...opts));
