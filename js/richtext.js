@@ -30,6 +30,10 @@
     }
     el.classList.toggle('is-empty', html === '');
     el._set(html);
+    if (el._shared && el._key === 'name') {
+      const c = PF.project.chars, w = el._obj === c.A ? 'A' : el._obj === c.B ? 'B' : null;
+      if (w) PF.$$(`.pf-avatar-text[data-init="${w}"]`, PF.frameEl).forEach((x) => (x.textContent = Array.from(el.textContent.trim())[0] || '?'));
+    }
     if (el._shared) {
       PF.$$('.pf-ed', PF.frameEl).forEach((x) => {
         if (x !== el && x._obj === el._obj && x._key === el._key) {

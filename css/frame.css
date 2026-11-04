@@ -262,3 +262,13 @@ body.is-dragging .pf-blk-tools { display: none !important; }
 
 .pf-frame.exporting .pf-block, .pf-frame.exporting .pf-sticker { box-shadow: none !important; outline: none !important; }
 .pf-frame.blocks-clear .pf-tl-dot i { box-shadow: none; }
+
+/* 관계도: 두상이 없을 때 */
+.pf-avatar.fill-solid.empty { background: var(--acc); }
+.pf-avatar.fill-line.empty { background: transparent; }
+.pf-avatar-text { font-family: var(--f-title); font-weight: 800; line-height: 1; color: var(--acc); text-align: center; max-width: 86%; overflow: hidden; }
+.pf-avatar.fill-solid .pf-avatar-text { color: #fff; }
+.pf-frame.editing .pf-avatar.has-alt { outline-style: solid; outline-width: 0; }
+.pf-frame.editing .pf-avatar.has-alt:hover { outline: 2px dashed color-mix(in srgb, var(--acc) 45%, transparent); outline-offset: 3px; }
+.pf-frame:not(.editing) .edit-only { display: none !important; }
+.pf-frame.editing .pf-avatar.edit-only { opacity: .45; }

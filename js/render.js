@@ -95,7 +95,8 @@
       el.append(img);
     } else {
       el.classList.add('empty');
-      if (o.ph !== '') el.append(h('span', { class: 'pf-img-ph' }, h('b', {}, '+'), o.ph || '이미지'));
+      if (o.empty) { el.classList.add('has-alt'); el.append(o.empty); }
+      else if (o.ph !== '') el.append(h('span', { class: 'pf-img-ph' }, h('b', {}, '+'), o.ph || '이미지'));
     }
     const upload = async (file) => {
       if (!file || !/^image\//.test(file.type)) return;
@@ -107,6 +108,7 @@
     if (!PF.ui.preview) {
       el.addEventListener('click', async (e) => {
         if (src) return; // 채워진 이미지는 블록 선택 → 오른쪽 패널에서 교체/조정
+        if (e.target.closest('.pf-ed')) return; // 원 안의 글자를 고치는 중
         e.stopPropagation();
         const b = el.closest('.pf-block');
         if (b) PF.select(b.dataset.id);

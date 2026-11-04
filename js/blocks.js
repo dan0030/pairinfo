@@ -109,13 +109,15 @@
   B.relation = {
     name: '관계도 화살표', icon: '⇄', desc: '두 사람의 두상과 서로를 향한 인상 · 호칭',
     create: () => ({
-      showImg: true, avatar: 150, subA: '', subB: '', dashed: false, shape: 'circle',
+      showImg: true, avatar: 150, subA: '', subB: '', dashed: false, shape: 'circle', noImg: 'initial', noImgFill: 'tint', symA: '☾', symB: '☆',
       aTop: 'A가 B에게 느끼는 인상', aBottom: '“호칭”', bTop: 'B가 A에게 느끼는 인상', bBottom: '“호칭”',
     }),
     options: [
       { key: 'showImg', label: '두상 이미지', type: 'check' },
       { key: 'shape', label: '두상 모양', type: 'select', choices: [['circle', '원형'], ['rounded', '둥근 사각'], ['square', '사각']] },
       { key: 'avatar', label: '두상 크기', type: 'range', min: 60, max: 280, step: 2 },
+      { key: 'noImg', label: '두상이 없을 때', type: 'select', choices: [['initial', '이름 첫 글자'], ['symbol', '직접 쓴 글자·기호'], ['blank', '빈 원만'], ['hide', '원 숨기고 이름만']] },
+      { key: 'noImgFill', label: '빈 원 색', type: 'select', choices: [['tint', '연한 캐릭터 색'], ['solid', '캐릭터 색 (흰 글자)'], ['line', '테두리만']] },
       { key: 'dashed', label: '점선 화살표', type: 'check' },
     ],
     images: () => ['A', 'B'].map((w) => ({ label: '캐릭터 ' + w + ' 두상', get: () => chars()[w].img, set: (r) => (chars()[w].img = r) })),
@@ -123,7 +125,7 @@
       const d = b.data;
       const person = (w) =>
         h('div', { class: 'pf-rel-person who-' + w },
-          d.showImg ? PF.imgSlot(chars()[w].img, (r) => (chars()[w].img = r), { cls: 'pf-avatar shape-' + d.shape, ratio: '1/1', ph: '두상', style: { width: d.avatar + 'px' } }) : null,
+          d.showImg ? avatarSlot(d, w) : null,
           charName(w, 'pf-name sm'),
           ed(d, 'sub' + w, { cls: 'pf-small muted', ph: '한 줄 설명' }));
       const arrow = (dir, top, bottom, w) =>
@@ -136,6 +138,27 @@
         person('B'));
     },
   };
+
+  /* 관계도 두상: 이미지가 없을 때 대신 보여줄 것 */
+  function avatarSlot(d, w) {
+    const ref = chars()[w].img;
+    const has = ref && PF.assets[ref.id];
+    const mode = d.noImg || 'initial';
+    const o = { cls: 'pf-avatar shape-' + d.shape + ' fill-' + (d.noImgFill || 'tint'), ratio: '1/1', ph: '두상', style: { width: d.avatar + 'px' } };
+    if (!has) {
+      if (mode === 'hide') o.cls += ' edit-only';
+      if (mode === 'initial') {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = chars()[w].name || '';
+        const ch = Array.from(tmp.textContent.trim())[0] || '?';
+        o.empty = h('span', { class: 'pf-avatar-text', 'data-init': w, style: { fontSize: Math.round(d.avatar * 0.42) + 'px' } }, ch);
+      } else if (mode === 'symbol') {
+        o.empty = ed(d, 'sym' + w, { cls: 'pf-avatar-text', ph: '글자', tag: 'span' });
+        o.empty.style.fontSize = Math.round(d.avatar * 0.36) + 'px';
+      }
+    }
+    return PF.imgSlot(ref, (r) => (chars()[w].img = r), o);
+  }
 
   B.summary = {
     name: '페어 요약', icon: '❝', desc: '굵은 글씨 요약 + 작은 글씨 세부 설명',
