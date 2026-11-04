@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>페어틀 메이커</title>
+<meta name="description" content="2인 페어의 서사를 정리하는 페어틀을 블록처럼 꾸며서 만드는 도구">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/frame.css">
+<style id="custom-fonts"></style>
+</head>
+<body>
+<header class="topbar">
+  <button class="icon-btn only-mobile" data-act="toggle-left" title="패널">☰</button>
+  <div class="brand">PAIR<b>FRAME</b><span>페어틀 메이커</span></div>
+  <div class="topbar-group">
+    <button class="btn" data-act="new">새로 만들기</button>
+    <button class="icon-btn" data-act="undo" title="되돌리기 (Ctrl+Z)">↶</button>
+    <button class="icon-btn" data-act="redo" title="다시하기 (Ctrl+Shift+Z)">↷</button>
+  </div>
+  <div class="topbar-group grow-gap">
+    <div class="zoom">
+      <button class="icon-btn" data-act="zoom-out" title="축소">−</button>
+      <button class="btn ghost" data-act="zoom-fit" id="zoom-label" title="화면에 맞추기">맞춤</button>
+      <button class="icon-btn" data-act="zoom-in" title="확대">+</button>
+    </div>
+    <label class="toggle"><input type="checkbox" id="preview-toggle"><span>미리보기</span></label>
+  </div>
+  <div class="topbar-group">
+    <button class="btn" data-act="import">불러오기</button>
+    <button class="btn" data-act="export-json">저장 파일</button>
+    <button class="btn primary" data-act="export-png">PNG 내보내기</button>
+    <button class="icon-btn only-mobile" data-act="toggle-right" title="속성">⚙</button>
+  </div>
+</header>
+
+<div class="workspace">
+  <aside class="panel left" id="panel-left">
+    <nav class="tabs">
+      <button class="tab on" data-tab="blocks">블록</button>
+      <button class="tab" data-tab="design">디자인</button>
+      <button class="tab" data-tab="stickers">스티커</button>
+    </nav>
+    <div class="tab-body" data-body="blocks">
+      <p class="hint">블록을 누르면 선택한 블록 아래에 추가됩니다. 선택이 없으면 맨 아래에 새 줄로 들어가요. 캔버스의 <b>⠿</b> 손잡이를 끌어서 위치를 옮길 수 있어요.</p>
+      <div class="block-palette" id="block-palette"></div>
+    </div>
+    <div class="tab-body hidden" data-body="design" id="design-body"></div>
+    <div class="tab-body hidden" data-body="stickers">
+      <p class="hint">배경이 투명한 PNG를 올리면 스티커 보관함에 들어갑니다. 누르면 페어틀에 붙어요. 크기·회전은 모서리 손잡이나 오른쪽 패널에서 조절하세요.</p>
+      <label class="btn wide primary file-btn">스티커 이미지 올리기<input type="file" accept="image/*" multiple id="sticker-upload" hidden></label>
+      <div class="sticker-lib" id="sticker-lib"></div>
+      <label class="check"><input type="checkbox" id="sticker-lock"> 스티커 잠그기 (글 편집할 때 방해되지 않게)</label>
+    </div>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div class="zoom-wrap" id="zoom-wrap">
+      <div class="zoom-inner" id="zoom-inner">
+        <div class="pf-frame" id="frame"></div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="panel right" id="panel-right">
+    <div id="inspector"></div>
+  </aside>
+</div>
+
+<div class="rt-bar hidden" id="rt-bar"></div>
+
+<div class="modal hidden" id="modal">
+  <div class="modal-card" id="modal-card"></div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+<input type="file" id="file-any" hidden>
+
+<script src="lib/html-to-image.js"></script>
+<script src="js/core.js"></script>
+<script src="js/blocks.js"></script>
+<script src="js/richtext.js"></script>
+<script src="js/render.js"></script>
+<script src="js/stickers.js"></script>
+<script src="js/inspector.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
