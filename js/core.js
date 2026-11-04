@@ -60,7 +60,7 @@
     radius: 26,
     borderWidth: 2,
     cardPad: 30,
-    fonts: { title: 'Paperlogy', body: 'Pretendard', custom: [] },
+    fonts: { title: 'Paperlogy', body: 'KoPubWorld Dotum', custom: [] },
     theme: Object.assign({}, PF.PRESETS['기본 (네이비·머스터드)']),
   });
 
@@ -113,7 +113,7 @@
     for (const k in PF.assets) if (PF.assets[k] === dataURL) return k;
     const id = 'a' + PF.uid();
     PF.assets[id] = dataURL;
-    PF.saveSoon();
+    PF.idb.put('assets', id, dataURL).catch(() => PF.toast('이미지를 저장할 공간이 부족해요'));
     return id;
   };
 
@@ -190,45 +190,145 @@
     PF.afterLoad();
   };
 
-  /* ---------- IndexedDB 자동 저장 ---------- */
+  /* ---------- IndexedDB: 여러 페어틀 자동 저장 ----------
+     kv       : 'current' → 지금 열린 페어틀 id
+     projects : id → { id, name, nameAuto, created, updated, thumb, data(JSON) }
+     assets   : id → dataURL (모든 페어틀이 함께 씀) */
   let dbp = null;
   function db() {
     if (!dbp)
       dbp = new Promise((res, rej) => {
-        const r = indexedDB.open('pairframe', 1);
-        r.onupgradeneeded = () => r.result.createObjectStore('kv');
+        const r = indexedDB.open('pairframe', 2);
+        r.onupgradeneeded = () => {
+          const d = r.result;
+          for (const n of ['kv', 'projects', 'assets']) if (!d.objectStoreNames.contains(n)) d.createObjectStore(n);
+        };
         r.onsuccess = () => res(r.result);
         r.onerror = () => rej(r.error);
       });
     return dbp;
   }
-  PF.dbGet = async (k) => {
-    try {
-      const d = await db();
-      return await new Promise((res) => {
-        const q = d.transaction('kv').objectStore('kv').get(k);
-        q.onsuccess = () => res(q.result);
-        q.onerror = () => res(undefined);
-      });
-    } catch (e) {
-      return undefined;
-    }
+  const req = (q) => new Promise((res, rej) => { q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+  PF.idb = {
+    async get(store, k) { try { return await req((await db()).transaction(store).objectStore(store).get(k)); } catch (e) { return undefined; } },
+    async put(store, k, v) { try { return await req((await db()).transaction(store, 'readwrite').objectStore(store).put(v, k)); } catch (e) { console.warn('저장 실패', e); throw e; } },
+    async del(store, k) { try { return await req((await db()).transaction(store, 'readwrite').objectStore(store).delete(k)); } catch (e) {} },
+    async all(store) {
+      try {
+        const st = (await db()).transaction(store).objectStore(store);
+        const [keys, vals] = await Promise.all([req(st.getAllKeys()), req(st.getAll())]);
+        return keys.map((k, i) => ({ key: k, value: vals[i] }));
+      } catch (e) { return []; }
+    },
   };
-  PF.dbSet = async (k, v) => {
-    try {
-      const d = await db();
-      d.transaction('kv', 'readwrite').objectStore('kv').put(v, k);
-    } catch (e) {}
+  PF.dbGet = (k) => PF.idb.get('kv', k);
+  PF.dbSet = (k, v) => PF.idb.put('kv', k, v);
+
+  PF.meta = null; // 지금 열린 페어틀의 { id, name, nameAuto, created, thumb }
+
+  PF.titleText = function (p = PF.project) {
+    for (const r of p.rows) for (const c of r.cols) for (const b of c.blocks)
+      if (b.type === 'title') return (b.data.title || '').replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
+    return '';
   };
+  PF.projectName = () => (PF.meta && !PF.meta.nameAuto && PF.meta.name) || PF.titleText() || '이름 없는 페어틀';
+
+  function setStatus(t, cls) {
+    const el = document.getElementById('save-status');
+    if (!el) return;
+    el.textContent = t;
+    el.className = 'save-status ' + (cls || '');
+  }
   let saveTimer = 0;
   PF.saveSoon = () => {
+    if (!PF.meta) return;
+    setStatus('저장 중…', 'busy');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(PF.saveNow, 700);
   };
-  PF.saveNow = () => {
-    if (!PF.project) return;
-    PF.dbSet('project', JSON.stringify(PF.project));
-    PF.dbSet('assets', PF.usedAssets(true));
+  PF.saveNow = async () => {
+    clearTimeout(saveTimer);
+    if (!PF.project || !PF.meta) return;
+    const m = PF.meta;
+    m.name = PF.projectName();
+    m.updated = Date.now();
+    try {
+      await PF.idb.put('projects', m.id, Object.assign({}, m, { data: JSON.stringify(PF.project) }));
+      await PF.dbSet('current', m.id);
+      const d = new Date(m.updated);
+      setStatus('자동 저장됨 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'), 'ok');
+    } catch (e) {
+      setStatus('저장 실패 — 저장 공간을 확인하세요', 'err');
+    }
+  };
+
+  /* 지금 페어틀 썸네일 (목록용, 작게) */
+  PF.makeThumb = async function () {
+    if (!PF.meta || !window.htmlToImage || !PF.frameEl) return;
+    try {
+      const f = PF.frameEl;
+      PF.meta.thumb = await htmlToImage.toJpeg(f, {
+        pixelRatio: 420 / f.offsetWidth, quality: 0.72, skipFonts: true, backgroundColor: PF.project.settings.theme.bg,
+        height: Math.min(f.offsetHeight, f.offsetWidth * 1.25),
+        filter: (n) => !(n.classList && n.classList.contains('pf-chrome')),
+      });
+      await PF.saveNow();
+    } catch (e) { console.warn('썸네일 실패', e); }
+  };
+
+  /* 새 페어틀을 목록에 추가하고 열기 */
+  PF.newProject = async function (project, name) {
+    if (PF.meta) await PF.saveNow();
+    PF.project = project;
+    PF.meta = { id: 'p' + PF.uid(), name: name || '', nameAuto: !name, created: Date.now(), thumb: null };
+    PF.ui.selected = PF.ui.selSticker = null;
+    PF.ui.zoom = 'fit';
+    PF.afterLoad();
+    PF.resetHistory();
+    await PF.saveNow();
+  };
+  PF.openProject = async function (id) {
+    const rec = await PF.idb.get('projects', id);
+    if (!rec) return false;
+    if (PF.meta && PF.meta.id !== id) await PF.saveNow();
+    const { data, ...meta } = rec;
+    PF.project = JSON.parse(data);
+    PF.meta = meta;
+    PF.ui.selected = PF.ui.selSticker = null;
+    PF.ui.zoom = 'fit';
+    PF.afterLoad();
+    PF.resetHistory();
+    await PF.dbSet('current', id);
+    return true;
+  };
+  PF.listProjects = async () => (await PF.idb.all('projects')).map((x) => x.value).sort((a, b) => b.updated - a.updated);
+
+  /* 어떤 페어틀도 쓰지 않는 이미지 · 글꼴 정리 */
+  PF.cleanupAssets = async function () {
+    const recs = await PF.idb.all('projects');
+    const all = recs.map((r) => r.value.data).join('\n') + JSON.stringify(PF.project || {});
+    for (const k of Object.keys(PF.assets)) {
+      if (!all.includes('"' + k + '"')) {
+        delete PF.assets[k];
+        PF.idb.del('assets', k);
+      }
+    }
+  };
+
+  /* 예전(한 개만 저장하던) 데이터 옮기기 */
+  PF.migrateOld = async function () {
+    const old = await PF.dbGet('project');
+    if (!old) return;
+    const oldAssets = (await PF.dbGet('assets')) || {};
+    for (const k in oldAssets) await PF.idb.put('assets', k, oldAssets[k]);
+    const id = 'p' + PF.uid();
+    let name = '';
+    try { const p = JSON.parse(old); PF.project = p; name = PF.titleText(p); } catch (e) {}
+    await PF.idb.put('projects', id, { id, name: name || '이전 페어틀', nameAuto: true, created: Date.now(), updated: Date.now(), thumb: null, data: old });
+    await PF.dbSet('current', id);
+    await PF.idb.del('kv', 'project');
+    await PF.idb.del('kv', 'assets');
+    PF.project = null;
   };
 
   /* 실제로 쓰이는 이미지만 골라내기 (스티커 보관함 포함) */

@@ -9,6 +9,7 @@
   PF.fontList = function () {
     const base = [
       { family: 'Paperlogy', label: '페이퍼로지' },
+      { family: 'KoPubWorld Dotum', label: '코펍월드 돋움' },
       { family: 'Pretendard', label: '프리텐다드' },
     ];
     const custom = (PF.project.settings.fonts.custom || []).map((c) => ({ family: c.name, label: c.name + ' (추가)' }));
@@ -33,7 +34,7 @@
     f.style.setProperty('--pad', s.cardPad + 'px');
     f.style.setProperty('--outer', s.pad + 'px');
     f.style.setProperty('--f-title', `${fam(s.fonts.title)}, 'Paperlogy', 'Pretendard', sans-serif`);
-    f.style.setProperty('--f-body', `${fam(s.fonts.body)}, 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif`);
+    f.style.setProperty('--f-body', `${fam(s.fonts.body)}, 'KoPubWorld Dotum', 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif`);
     f.style.width = s.width + 'px';
   }
   PF.applyVars = applyVars;

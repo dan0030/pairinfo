@@ -19,7 +19,7 @@
     PF.saveSoon();
   };
 
-  function loadTemplate(key, keep) {
+  async function loadTemplate(key, keep) {
     const old = PF.project;
     const p = PF.TEMPLATES[key].make();
     if (keep && old) {
@@ -29,37 +29,94 @@
       p.chars = JSON.parse(JSON.stringify(old.chars));
       p.stickerLib = (old.stickerLib || []).slice();
     }
-    PF.project = p;
-    PF.ui.selected = PF.ui.selSticker = null;
-    PF.ui.zoom = 'fit';
-    PF.afterLoad();
-    PF.commit();
+    if (PF.meta) await PF.makeThumb();
+    await PF.newProject(p);
+    PF.toast('새 페어틀을 만들었어요. 이전 작업은 “내 페어틀”에 저장돼 있어요');
   }
 
   /* ---------- 모달 ---------- */
-  function modal(content) {
+  function modal(content, cls) {
     const m = $('#modal'), c = $('#modal-card');
+    c.className = 'modal-card ' + (cls || '');
     c.replaceChildren(...[].concat(content));
     m.classList.remove('hidden');
   }
   const closeModal = () => $('#modal').classList.add('hidden');
-  $('#modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal' && PF.project) closeModal(); });
+  $('#modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal' && PF.meta) closeModal(); });
 
   function templateModal(first) {
     const keep = h('input', { type: 'checkbox' });
     const card = (key) => {
       const t = PF.TEMPLATES[key];
-      return h('button', { class: 'tpl-card', onclick: () => { if (!first && !confirm('지금 작업 중인 페어틀이 바뀌어요. 계속할까요?\n(필요하면 먼저 “저장 파일”로 백업하세요)')) return; loadTemplate(key, keep.checked); closeModal(); } },
-        h('div', { class: 'tpl-thumb tpl-' + key }, ...(key === 'simple' ? ['t', 'r', 's', 'k'] : ['t', 'c', 'c', 'r', 'i', 'l', 'm', 'q']).map((x) => h('i', { class: 'x-' + x }))),
+      return h('button', { class: 'tpl-card', onclick: async () => { closeModal(); await loadTemplate(key, keep.checked); } },
+        h('div', { class: 'tpl-thumb tpl-' + key }, ...(key === 'simple' ? ['t', 'r', 's'] : ['t', 'c', 'c', 'r', 'i', 'l', 'm', 'q']).map((x) => h('i', { class: 'x-' + x }))),
         h('b', {}, t.name), h('span', {}, t.desc));
     };
     modal([
-      h('h2', {}, first ? '어떤 페어틀을 만들까요?' : '새로 만들기'),
-      h('p', { class: 'muted' }, '템플릿은 출발점일 뿐이에요. 블록을 자유롭게 더하고, 빼고, 옮길 수 있어요.'),
+      h('h2', {}, first ? '어떤 페어틀을 만들까요?' : '새 페어틀 만들기'),
+      h('p', { class: 'muted' }, '템플릿은 출발점일 뿐이에요. 블록을 자유롭게 더하고, 빼고, 옮길 수 있어요.' + (first ? '' : ' 지금 작업은 “내 페어틀”에 그대로 남아요.')),
       h('div', { class: 'tpl-grid' }, card('simple'), card('detail')),
-      first ? null : h('label', { class: 'check' }, keep, ' 지금의 색 · 글꼴 · 캐릭터(이름·두상) · 스티커 보관함 유지하기'),
+      first ? null : h('label', { class: 'check' }, keep, ' 지금의 색 · 글꼴 · 캐릭터(이름·두상) · 스티커 보관함 가져오기'),
       first ? null : h('div', { class: 'modal-actions' }, h('button', { class: 'btn', onclick: closeModal }, '취소')),
     ]);
+  }
+
+  /* ---------- 내 페어틀 (여러 개 저장) ---------- */
+  const fmtTime = (t) => {
+    const d = new Date(t), now = new Date();
+    const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return d.toDateString() === now.toDateString() ? '오늘 ' + hm : `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} ${hm}`;
+  };
+  async function libraryModal() {
+    modal([h('h2', {}, '내 페어틀'), h('p', { class: 'muted' }, '불러오는 중…')], 'wide');
+    await PF.makeThumb();
+    const list = await PF.listProjects();
+    const grid = h('div', { class: 'lib-grid' });
+    grid.append(h('button', { class: 'proj-card new', onclick: () => templateModal(false) }, h('div', { class: 'proj-thumb' }, h('b', {}, '+')), h('b', {}, '새 페어틀')));
+    list.forEach((r) => {
+      const cur = PF.meta && r.id === PF.meta.id;
+      const open = async () => { if (!cur) { await PF.openProject(r.id); PF.toast('“' + r.name + '” 을(를) 열었어요'); } closeModal(); };
+      grid.append(h('div', { class: 'proj-card' + (cur ? ' cur' : '') },
+        h('button', { class: 'proj-thumb', title: '열기', onclick: open }, r.thumb ? h('img', { src: r.thumb, alt: '' }) : h('span', { class: 'muted' }, '미리보기 없음')),
+        h('div', { class: 'proj-info' },
+          h('b', { class: 'proj-name', title: r.name }, r.name || '이름 없는 페어틀'),
+          h('span', { class: 'muted sm' }, (cur ? '편집 중 · ' : '') + fmtTime(r.updated))),
+        h('div', { class: 'proj-acts' },
+          h('button', { class: 'mini', onclick: open }, cur ? '계속 편집' : '열기'),
+          h('button', { class: 'mini', onclick: async () => {
+            const n = prompt('페어틀 이름 (비워두면 페어명을 따라가요)', r.nameAuto ? '' : r.name);
+            if (n === null) return;
+            const nm = n.trim();
+            if (cur) { PF.meta.nameAuto = !nm; PF.meta.name = nm; await PF.saveNow(); }
+            else { r.nameAuto = !nm; r.name = nm || '이름 없는 페어틀'; await PF.idb.put('projects', r.id, r); }
+            libraryModal();
+          } }, '이름'),
+          h('button', { class: 'mini', onclick: async () => {
+            if (cur) await PF.saveNow();
+            const src = cur ? Object.assign({}, PF.meta, { data: JSON.stringify(PF.project) }) : r;
+            const id = 'p' + PF.uid();
+            await PF.idb.put('projects', id, Object.assign({}, src, { id, name: (cur ? PF.projectName() : r.name) + ' 복사본', nameAuto: false, created: Date.now(), updated: Date.now() }));
+            libraryModal();
+          } }, '복제'),
+          h('button', { class: 'mini danger', onclick: async () => {
+            if (!confirm('“' + r.name + '” 을(를) 지울까요? 되돌릴 수 없어요.')) return;
+            await PF.idb.del('projects', r.id);
+            if (cur) {
+              PF.meta = null;
+              const rest = await PF.listProjects();
+              if (rest.length) await PF.openProject(rest[0].id);
+              else { closeModal(); templateModal(true); return; }
+            }
+            await PF.cleanupAssets();
+            libraryModal();
+          } }, '삭제'))));
+    });
+    modal([
+      h('h2', {}, '내 페어틀'),
+      h('p', { class: 'muted' }, `이 브라우저에 자동 저장된 페어틀 ${list.length}개. 다른 기기·브라우저로 옮기거나 백업하려면 “저장 파일”을 쓰세요.`),
+      grid,
+      h('div', { class: 'modal-actions' }, h('button', { class: 'btn', onclick: closeModal }, '닫기')),
+    ], 'wide');
   }
 
   /* ---------- PNG 내보내기 ---------- */
@@ -140,13 +197,10 @@
     try {
       const data = JSON.parse(await PF.readFile(file, 'text'));
       if (data.format !== FORMAT || !data.project || !Array.isArray(data.project.rows)) throw new Error('형식 아님');
-      if (!confirm('불러온 페어틀로 바꿀까요? 지금 작업은 사라져요.')) return;
-      for (const k in data.assets || {}) if (/^data:(image|font|application|binary)\//.test(data.assets[k])) PF.assets[k] = data.assets[k];
-      PF.project = PF.deepSanitize(data.project);
-      PF.ui.selected = PF.ui.selSticker = null;
-      PF.afterLoad();
-      PF.commit();
-      PF.toast('불러왔어요');
+      for (const k in data.assets || {}) if (/^data:(image|font|application|binary)\//.test(data.assets[k])) { PF.assets[k] = data.assets[k]; await PF.idb.put('assets', k, data.assets[k]); }
+      if (PF.meta) await PF.makeThumb();
+      await PF.newProject(PF.deepSanitize(data.project));
+      PF.toast('불러온 페어틀을 “내 페어틀”에 추가했어요');
     } catch (e) {
       console.error(e);
       PF.toast('페어틀 저장 파일(.json)이 아니에요');
@@ -171,6 +225,7 @@
   const closeDrawers = () => { $('#panel-left').classList.remove('open'); $('#panel-right').classList.remove('open'); };
   const actions = {
     new: () => templateModal(false),
+    library: libraryModal,
     undo: PF.undo,
     redo: PF.redo,
     'zoom-in': () => { PF.ui.zoom = Math.min(3, Math.round((PF.zoomScale + 0.1) * 10) / 10); PF.applyZoom(); },
@@ -205,6 +260,7 @@
     else if (e.key === 'Escape' && !inEd) { closeModal(); PF.select(null); }
   });
   addEventListener('beforeunload', () => PF.saveNow());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) PF.saveNow(); });
 
   /* ---------- 시작 ---------- */
   async function start() {
@@ -212,23 +268,19 @@
     PF.initRichText(PF.frameEl);
     PF.initStickers();
     renderPalette();
-    const saved = await PF.dbGet('project');
-    const assets = await PF.dbGet('assets');
-    if (assets) Object.assign(PF.assets, assets);
-    let first = false;
-    try {
-      PF.project = saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      PF.project = null;
-    }
-    if (!PF.project) {
-      PF.project = PF.TEMPLATES.detail.make();
-      first = true;
-    }
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    await PF.migrateOld();
+    for (const { key, value } of await PF.idb.all('assets')) PF.assets[key] = value;
+    const cur = await PF.dbGet('current');
+    const list = await PF.listProjects();
+    const id = list.some((r) => r.id === cur) ? cur : list[0] && list[0].id;
+    // 도구막대는 프로젝트가 있어야 색을 그릴 수 있어서 임시 프로젝트로 먼저 준비
+    PF.project = PF.TEMPLATES.detail.make();
     PF.buildRichBar();
+    if (id && (await PF.openProject(id))) return;
     PF.afterLoad();
     PF.resetHistory();
-    if (first) templateModal(true);
+    templateModal(true);
   }
   start();
 })();

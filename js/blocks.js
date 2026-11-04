@@ -52,15 +52,21 @@
 
   /* ===== 공통 ===== */
   B.title = {
-    name: '페어명', icon: '𝐓', desc: '페어 이름과 캐치프레이즈',
-    create: () => ({ label: 'PAIR NAME', title: '페어 이름', sub: '' , align: 'left'}),
-    options: [{ key: 'align', label: '정렬', type: 'select', choices: [['left', '왼쪽'], ['center', '가운데'], ['right', '오른쪽']] }],
+    name: '페어명', icon: '𝐓', desc: '페어 이름 · 캐치프레이즈 · 페어 키워드',
+    create: () => ({ label: 'PAIR NAME', title: '페어 이름', sub: '', align: 'left', showTags: true, hash: true, tags: ['키워드', '키워드', '키워드'] }),
+    options: [
+      { key: 'align', label: '정렬', type: 'select', choices: [['left', '왼쪽'], ['center', '가운데'], ['right', '오른쪽']] },
+      { key: 'showTags', label: '페어 키워드(해시태그)', type: 'check' },
+      { key: 'hash', label: '# 자동으로 붙이기', type: 'check' },
+    ],
     render(b) {
       const d = b.data;
+      if (d.showTags && !Array.isArray(d.tags)) d.tags = [];
       return h('div', { class: 'pf-title-block', style: { textAlign: d.align } },
         ed(d, 'label', { cls: 'pf-label', ph: 'LABEL' }),
         ed(d, 'title', { cls: 'pf-title-xl', ph: '페어 이름' }),
-        ed(d, 'sub', { cls: 'pf-sub', ph: '부제 / 한 줄 소개 (비워두면 안 보여요)' }));
+        ed(d, 'sub', { cls: 'pf-sub', ph: '부제 / 한 줄 소개 (비워두면 안 보여요)' }),
+        d.showTags ? tagList(d.tags, { hash: d.hash, cls: 'pill align-' + d.align }) : null);
     },
   };
 
@@ -70,7 +76,7 @@
       who: w, label: 'CHARACTER ' + w, ratio: '6/5', showImg: true, showTags: true, showProfile: true, showFields: true,
       tags: ['#키워드', '#키워드'],
       profile: '',
-      fields: [{ k: '상징', v: '' }, { k: '디테일', v: '' }],
+      fields: [{ k: '소속', v: '' }, { k: '상징', v: '' }],
     }),
     defStyle: 'accent',
     options: [
@@ -79,7 +85,7 @@
       { key: 'showImg', label: '두상 이미지', type: 'check' },
       { key: 'showTags', label: '프로필 키워드', type: 'check' },
       { key: 'showProfile', label: '간략 프로필 글', type: 'check' },
-      { key: 'showFields', label: '항목 표 (상징/디테일 등)', type: 'check' },
+      { key: 'showFields', label: '항목 표 (소속/상징 등)', type: 'check' },
     ],
     list: { key: 'fields', label: '항목 표', make: () => ({ k: '항목', v: '' }), title: (it) => it.k },
     images: (b) => [{ label: '캐릭터 ' + who(b.data.who) + ' 두상', get: () => chars()[who(b.data.who)].img, set: (r) => (chars()[who(b.data.who)].img = r) }],
@@ -326,7 +332,7 @@
   };
 
   PF.PALETTE = [
-    ['간략·상세 공통', ['title', 'relation', 'summary', 'hashtags', 'character']],
+    ['간략·상세 공통', ['title', 'relation', 'summary', 'character', 'hashtags']],
     ['상세', ['heading', 'text', 'image', 'timeline', 'music', 'quotes']],
     ['꾸미기', ['gallery', 'yesno', 'spacer']],
   ];
@@ -350,14 +356,10 @@
         t.data.label = 'PAIR';
         const rel = PF.makeBlock('relation');
         const sum = PF.makeBlock('summary');
-        const tags = PF.makeBlock('hashtags');
-        tags.style = 'plain';
-        tags.data.showLabel = false;
-        tags.data.align = 'center';
         return {
           settings: s,
           chars: { A: { name: '캐릭터 A', img: null }, B: { name: '캐릭터 B', img: null } },
-          rows: [PF.makeRow([[t]]), PF.makeRow([[rel]]), PF.makeRow([[sum]]), PF.makeRow([[tags]])],
+          rows: [PF.makeRow([[t]]), PF.makeRow([[rel]]), PF.makeRow([[sum]])],
           stickers: [],
           stickerLib: [],
         };
@@ -370,9 +372,6 @@
         const s = PF.defaultSettings(1600);
         const t = PF.makeBlock('title');
         t.data.label = 'PAIR CATCHPHRASE';
-        const tags = PF.makeBlock('hashtags');
-        tags.style = 'plain';
-        tags.data.showLabel = false;
         const rel = PF.makeBlock('relation');
         rel.data.avatar = 130;
         const world = PF.makeBlock('text');
@@ -385,7 +384,7 @@
           settings: s,
           chars: { A: { name: '캐릭터 A', img: null }, B: { name: '캐릭터 B', img: null } },
           rows: [
-            PF.makeRow([[t, tags]]),
+            PF.makeRow([[t]]),
             PF.makeRow([[PF.makeBlock('character', 'A')], [PF.makeBlock('character', 'B')], [rel, world]], [1, 1, 1.6]),
             PF.makeRow([[img, sum], [tl]], [1, 1.5]),
             PF.makeRow([[mus], [q]], [1.2, 1]),

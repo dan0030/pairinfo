@@ -10,3 +10,7 @@
 @font-face{font-family:'Paperlogy';font-weight:700;font-display:swap;src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-7Bold.woff2') format('woff2');}
 @font-face{font-family:'Paperlogy';font-weight:800;font-display:swap;src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-8ExtraBold.woff2') format('woff2');}
 @font-face{font-family:'Paperlogy';font-weight:900;font-display:swap;src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-9Black.woff2') format('woff2');}
+/* 본문 기본: 코펍월드 돋움체 (KoPubWorld Dotum, 문화체육관광부·한국출판인회의 — 무료 사용/재배포 가능, 판매 금지) */
+@font-face{font-family:'KoPubWorld Dotum';font-weight:100 350;font-display:swap;src:url('https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.3/fonts/KoPubWorld-Dotum-Light.woff2') format('woff2');}
+@font-face{font-family:'KoPubWorld Dotum';font-weight:351 550;font-display:swap;src:url('https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.3/fonts/KoPubWorld-Dotum-Medium.woff2') format('woff2');}
+@font-face{font-family:'KoPubWorld Dotum';font-weight:551 950;font-display:swap;src:url('https://cdn.jsdelivr.net/npm/font-kopubworld@1.0.3/fonts/KoPubWorld-Dotum-Bold.woff2') format('woff2');}

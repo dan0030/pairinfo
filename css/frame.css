@@ -4,7 +4,7 @@
   --c-a: #1f2a5a; --c-b: #d2ae45; --c-tag: #eceef2; --c-tagtext: #33373f; --c-hl: #fbe38a; --c-line: #e4e6eb;
   --radius: 26px; --bw: 2px; --gap: 22px; --pad: 30px; --outer: 48px;
   --f-title: 'Paperlogy', 'Pretendard', sans-serif;
-  --f-body: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  --f-body: 'KoPubWorld Dotum', 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   position: relative;
   background: var(--c-bg);
   color: var(--c-text);
@@ -51,7 +51,7 @@
 
 /* ---------- 글자 ---------- */
 .pf-ed { outline: none; min-width: 1ch; white-space: pre-wrap; }
-.pf-label { font-family: var(--f-body); font-size: 12.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--c-muted); line-height: 1.4; }
+.pf-label { font-family: var(--f-title); font-size: 12.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--c-muted); line-height: 1.4; }
 .pf-label.acc, .acc { color: var(--acc); }
 .pf-label.inline { display: inline-block; }
 .pf-title-xl { font-family: var(--f-title); font-weight: 800; font-size: 46px; line-height: 1.2; color: var(--c-title); letter-spacing: -.01em; margin-top: 6px; }
@@ -81,6 +81,8 @@
 /* ---------- 태그 ---------- */
 .pf-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .pf-tags.align-center { justify-content: center; }
+.pf-tags.align-right { justify-content: flex-end; }
+.pf-title-block .pf-tags { margin-top: 16px; }
 .pf-tag { display: inline-block; background: var(--c-tag); color: var(--c-tagtext); font-weight: 700; font-size: 16px; padding: 5px 14px; border-radius: 999px; line-height: 1.5; }
 .pf-tags.hash .pf-tag::before { content: '#'; }
 .pf-tags.hash .pf-tag.is-empty::before { content: '#' attr(data-ph); }
