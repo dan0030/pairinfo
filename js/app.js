@@ -216,15 +216,55 @@
       const g = h('div', { class: 'pal-grid' });
       types.forEach((t) => {
         const d = PF.BLOCKS[t];
-        g.append(h('button', { class: 'pal-item', title: d.desc, onclick: () => { PF.addBlock(t); closeDrawers(); } }, h('span', { class: 'pal-ico' }, d.icon), h('b', {}, d.name), h('small', {}, d.desc)));
+        g.append(h('button', { class: 'pal-item', title: d.desc, onclick: () => { PF.addBlock(t); PF.closeSheets(); if (PF.isMobile()) PF.toast('“' + d.name + '” 블록을 추가했어요'); } }, h('span', { class: 'pal-ico' }, d.icon), h('b', {}, d.name), h('small', {}, d.desc)));
       });
       box.append(g);
     });
   }
 
+  /* ---------- 모바일 시트 ---------- */
+  const SHEET_TITLE = { blocks: '블록 추가', design: '디자인', stickers: '스티커' };
+  function setTab(name) {
+    $$('.tab').forEach((x) => x.classList.toggle('on', x.dataset.tab === name));
+    $$('.tab-body').forEach((b) => b.classList.toggle('hidden', b.dataset.body !== name));
+  }
+  PF.openSheet = function (name) {
+    const left = $('#panel-left'), right = $('#panel-right');
+    const isOpen = (name === 'props' ? right : left).classList.contains('open') && PF.ui.sheet === name;
+    PF.closeSheets();
+    if (isOpen) return; // 같은 탭을 다시 누르면 닫기
+    if (name === 'props') right.classList.add('open');
+    else { setTab(name); $('#sheet-title-left').textContent = SHEET_TITLE[name]; left.classList.add('open'); left.scrollTop = 0; }
+    PF.ui.sheet = name;
+    $('#sheet-backdrop').classList.remove('hidden');
+    $$('#mtabs [data-sheet]').forEach((b) => b.classList.toggle('on', b.dataset.sheet === name));
+  };
+  PF.closeSheets = function () {
+    $('#panel-left').classList.remove('open');
+    $('#panel-right').classList.remove('open');
+    $('#sheet-backdrop').classList.add('hidden');
+    $$('#mtabs [data-sheet]').forEach((b) => b.classList.remove('on'));
+    PF.ui.sheet = null;
+  };
+  $$('#mtabs [data-sheet]').forEach((b) => b.addEventListener('click', () => PF.openSheet(b.dataset.sheet)));
+  function setPreview(on) {
+    PF.ui.preview = on;
+    $('#preview-toggle').checked = on;
+    $('#m-preview').classList.toggle('on', on);
+    PF.ui.selected = PF.ui.selSticker = null;
+    document.body.classList.toggle('previewing', on);
+    PF.closeSheets();
+    PF.render();
+  }
+
   /* ---------- 상단 ---------- */
-  const closeDrawers = () => { $('#panel-left').classList.remove('open'); $('#panel-right').classList.remove('open'); };
+  const fileMenu = $('#file-menu');
+  document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.menu-wrap')) fileMenu.classList.add('hidden'); });
   const actions = {
+    'menu-file': () => fileMenu.classList.toggle('hidden'),
+    'close-sheets': () => PF.closeSheets(),
+    'toggle-preview': () => setPreview(!PF.ui.preview),
+    'close-text': () => PF.closeTextSheet && PF.closeTextSheet(),
     new: () => templateModal(false),
     library: libraryModal,
     undo: PF.undo,
@@ -235,36 +275,30 @@
     import: importJson,
     'export-json': exportJson,
     'export-png': exportModal,
-    'toggle-left': () => { $('#panel-right').classList.remove('open'); $('#panel-left').classList.toggle('open'); },
-    'toggle-right': () => { $('#panel-left').classList.remove('open'); $('#panel-right').classList.toggle('open'); },
   };
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
-    if (b && actions[b.dataset.act]) actions[b.dataset.act]();
+    if (!b || !actions[b.dataset.act]) return;
+    if (b.closest('.menu')) fileMenu.classList.add('hidden');
+    actions[b.dataset.act]();
   });
-  $$('.tab').forEach((t) => t.addEventListener('click', () => {
-    $$('.tab').forEach((x) => x.classList.toggle('on', x === t));
-    $$('.tab-body').forEach((b) => b.classList.toggle('hidden', b.dataset.body !== t.dataset.tab));
-  }));
-  $('#preview-toggle').addEventListener('change', (e) => {
-    PF.ui.preview = e.target.checked;
-    PF.ui.selected = PF.ui.selSticker = null;
-    document.body.classList.toggle('previewing', PF.ui.preview);
-    PF.render();
-  });
+  $$('.tab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
+  $('#preview-toggle').addEventListener('change', (e) => setPreview(e.target.checked));
   document.addEventListener('keydown', (e) => {
     const inEd = document.activeElement && (document.activeElement.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
     const mod = e.ctrlKey || e.metaKey;
     if (mod && !inEd && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? PF.redo() : PF.undo(); }
     else if (mod && !inEd && e.key.toLowerCase() === 'y') { e.preventDefault(); PF.redo(); }
     else if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); PF.saveNow(); PF.toast('이 브라우저에 저장했어요'); }
-    else if (e.key === 'Escape' && !inEd) { closeModal(); PF.select(null); }
+    else if (e.key === 'Escape' && !inEd) { closeModal(); PF.closeSheets(); fileMenu.classList.add('hidden'); PF.select(null); }
   });
   addEventListener('beforeunload', () => PF.saveNow());
   document.addEventListener('visibilitychange', () => { if (document.hidden) PF.saveNow(); });
 
   /* ---------- 시작 ---------- */
   async function start() {
+    PF.fillIcons();
+    PF.onMobileChange(() => { PF.closeSheets(); PF.closeTextSheet && PF.closeTextSheet(); if (PF.project) PF.render(); });
     PF.initCanvas();
     PF.initRichText(PF.frameEl);
     PF.initStickers();

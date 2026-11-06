@@ -52,6 +52,7 @@
 
   /* ===== 공통 ===== */
   B.title = {
+    tags: 'tags', tagsWhen: (b) => b.data.showTags,
     name: '페어명', icon: '𝐓', desc: '페어 이름 · 캐치프레이즈 · 페어 키워드',
     create: () => ({ label: 'PAIR NAME', title: '페어 이름', sub: '', align: 'left', showTags: true, hash: true, tags: ['키워드', '키워드', '키워드'] }),
     options: [
@@ -71,6 +72,7 @@
   };
 
   B.character = {
+    tags: 'tags', tagsWhen: (b) => b.data.showTags,
     name: '캐릭터 프로필', icon: '☺', desc: '두상 · 이름 · 키워드 · 간략 프로필',
     create: (w = 'A') => ({
       who: w, label: 'CHARACTER ' + w, ratio: '6/5', showImg: true, showTags: true, showProfile: true, showFields: true,
@@ -179,6 +181,7 @@
   };
 
   B.hashtags = {
+    tags: 'tags',
     name: '페어 키워드', icon: '#', desc: '해시태그 형식 키워드',
     create: () => ({ label: 'KEYWORD', showLabel: true, auto: true, tags: ['키워드', '키워드', '키워드'], size: 'md', align: 'left' }),
     options: [

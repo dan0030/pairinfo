@@ -129,9 +129,58 @@
   }
 
   /* ---------- 속성 패널 ---------- */
+  /* ---------- 모바일: 선택한 블록 · 스티커 조작 막대 ---------- */
+  const ibtn = (icon, title, fn, cls, disabled) => {
+    const b = h('button', { title, class: cls || '', disabled: disabled || null, onclick: fn });
+    b.innerHTML = PF.icon(icon);
+    return b;
+  };
+  PF.updateSelbar = function () {
+    const bar = $('#selbar');
+    if (!bar) return;
+    const st = PF.ui.selSticker && PF.project.stickers.find((s) => s.id === PF.ui.selSticker);
+    const f = !st && PF.ui.selected && PF.findBlock(PF.ui.selected);
+    if (!PF.isMobile() || PF.ui.preview || (!st && !f)) return bar.classList.add('hidden');
+    const props = h('button', { class: 'props', onclick: () => PF.openSheet('props') });
+    props.innerHTML = PF.icon('sliders') + '<span>속성</span>';
+    if (st) {
+      const arr = PF.project.stickers;
+      bar.replaceChildren(h('span', { class: 'sel-name' }, '스티커'),
+        ibtn('copy', '복제', () => { const c = Object.assign({}, st, { id: 's' + PF.uid(), x: st.x + 30, y: st.y + 30 }); arr.push(c); PF.ui.selSticker = c.id; full(); }),
+        ibtn('trash', '삭제', () => { arr.splice(arr.indexOf(st), 1); PF.ui.selSticker = null; full(); }, 'danger'),
+        props);
+    } else {
+      const b = f.block;
+      bar.replaceChildren(h('span', { class: 'sel-name' }, PF.BLOCKS[b.type].name),
+        ibtn('up', '위로', () => PF.moveBlock(b.id, -1)),
+        ibtn('down', '아래로', () => PF.moveBlock(b.id, 1)),
+        ibtn('left', '왼쪽 칸으로', () => PF.moveBlockCol(b.id, -1), '', f.ci === 0),
+        ibtn('right', '오른쪽 칸으로', () => PF.moveBlockCol(b.id, 1), '', f.ci === f.row.cols.length - 1),
+        ibtn('copy', '복제', () => PF.duplicateBlock(b.id)),
+        ibtn('trash', '삭제', () => PF.deleteBlock(b.id), 'danger'),
+        props);
+    }
+    bar.classList.remove('hidden');
+  };
+
+  /* 키워드(해시태그) 목록 */
+  function tagControls(arr) {
+    const box = h('div', { class: 'list-ctl' });
+    arr.forEach((t, i) => {
+      const txt = String(t).replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+      box.append(h('div', { class: 'list-row' }, h('span', { class: 'list-title' }, txt || '(빈 키워드)'),
+        h('button', { class: 'mini', title: '앞으로', disabled: i === 0, onclick: () => { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; full(); } }, '↑'),
+        h('button', { class: 'mini', title: '뒤로', disabled: i === arr.length - 1, onclick: () => { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; full(); } }, '↓'),
+        h('button', { class: 'mini danger', title: '삭제', onclick: () => { arr.splice(i, 1); full(); } }, '✕')));
+    });
+    box.append(btn('+ 키워드 추가', () => { arr.push('새 키워드'); full(); }, 'wide'));
+    return box;
+  }
+
   PF.renderInspector = function () {
     const box = $('#inspector');
     box.replaceChildren();
+    PF.updateSelbar();
     if (PF.ui.preview) {
       box.append(section('미리보기 중', h('p', { class: 'hint' }, '편집하려면 위쪽의 “미리보기”를 끄세요.')));
       return;
@@ -154,6 +203,8 @@
     const imgs = def.images ? def.images(b) : [];
     if (imgs.length) box.append(section('이미지', h('p', { class: 'hint' }, '빈 이미지 칸을 누르거나 파일을 끌어다 놓아도 돼요.'), ...imgs.map(imageControls)));
 
+    if (def.tags && Array.isArray(b.data[def.tags]) && (def.tagsWhen ? def.tagsWhen(b) : true))
+      box.append(section('키워드', h('p', { class: 'hint' }, '키워드 글자는 캔버스에서 눌러 고쳐요.'), tagControls(b.data[def.tags])));
     if (def.list) box.append(section(def.list.label, listControls(b, def.list)));
 
     box.append(section('카드 모양',
@@ -165,6 +216,8 @@
 
     box.append(section('블록', h('div', { class: 'btns' },
       btn('↑ 위로', () => PF.moveBlock(b.id, -1)), btn('↓ 아래로', () => PF.moveBlock(b.id, 1)),
+      f.row.cols.length > 1 ? btn('← 왼쪽 칸', () => PF.moveBlockCol(b.id, -1)) : null,
+      f.row.cols.length > 1 ? btn('오른쪽 칸 →', () => PF.moveBlockCol(b.id, 1)) : null,
       btn('복제', () => PF.duplicateBlock(b.id)), btn('삭제', () => PF.deleteBlock(b.id), 'danger'))));
 
     box.append(rowControls(f));
@@ -172,13 +225,22 @@
 
   function emptyInspector(box) {
     const c = PF.project.chars;
+    const em = h('div', { class: 'insp-empty' });
+    em.innerHTML = PF.icon('sliders') + (PF.isMobile() ? '블록을 누르면 여기서 옵션·색·배치를 바꿀 수 있어요.' : '블록이나 스티커를 선택하면<br>여기서 옵션·색·배치를 바꿀 수 있어요.');
+    box.append(em);
     box.append(section('캐릭터 두상',
       h('p', { class: 'hint' }, '두상은 관계도 · 프로필 · 대사 블록에서 함께 쓰여요. 이름은 캔버스에서 직접 고치면 모든 곳에 반영됩니다.'),
       ...['A', 'B'].map((w) => imageControls({ label: '캐릭터 ' + w + ' — ' + (c[w].name || '').replace(/<[^>]+>/g, ''), get: () => c[w].img, set: (r) => (c[w].img = r) }))));
     box.append(section('사용법', h('ul', { class: 'howto' },
-      h('li', {}, '캔버스의 글자를 눌러 바로 고치고, 드래그해서 선택하면 글자 꾸밈 막대가 나와요.'),
-      h('li', {}, '블록을 누르면 이 패널에서 옵션 · 색 · 줄 나누기를 바꿀 수 있어요.'),
-      h('li', {}, '⠿ 손잡이를 끌면 다른 칸이나 줄 사이로 옮겨져요.'),
+      ...(PF.isMobile() ? [
+        h('li', {}, '캔버스의 글자를 누르면 아래에 글 편집 창이 열려요. 꾸밈 막대로 글꼴·색·크기를 바꿀 수 있어요.'),
+        h('li', {}, '블록을 누르면 아래 막대에서 위·아래·옆 칸으로 옮기거나 복제·삭제할 수 있어요.'),
+        h('li', {}, '두 손가락으로 벌리거나 메뉴의 “화면에 맞추기”로 크기를 바꿔 보세요.'),
+      ] : [
+        h('li', {}, '캔버스의 글자를 눌러 바로 고치고, 드래그해서 선택하면 글자 꾸밈 막대가 나와요.'),
+        h('li', {}, '블록을 누르면 이 패널에서 옵션 · 색 · 줄 나누기를 바꿀 수 있어요.'),
+        h('li', {}, '⠿ 손잡이를 끌면 다른 칸이나 줄 사이로 옮겨져요.'),
+      ]),
       h('li', {}, '작업은 이 브라우저에 자동 저장돼요. 다른 기기로 옮기려면 “저장 파일”을 쓰세요.'))));
   }
 

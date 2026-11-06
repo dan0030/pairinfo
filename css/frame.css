@@ -279,3 +279,26 @@ body.is-dragging .pf-blk-tools { display: none !important; }
 .pf-char.tags-line { --tag-bg-d: transparent; --tag-text-d: var(--acc); }
 .pf-char.tags-line .pf-tag { box-shadow: inset 0 0 0 1.5px var(--tag-text, var(--acc)); }
 .pf-char .pf-tag { background: var(--tag-bg, var(--tag-bg-d, var(--c-tag))); color: var(--tag-text, var(--tag-text-d, var(--c-tagtext))); }
+
+/* ===== 편집 표시 크기 보정: 캔버스를 축소해도 손잡이·도구는 같은 크기로 ===== */
+.pf-frame { --inv: 1; }
+.pf-blk-tools { top: auto; bottom: 100%; margin-bottom: calc(-14px * var(--inv)); transform: scale(var(--inv)); transform-origin: right bottom; gap: 1px; padding: 3px 4px; border-radius: 10px; }
+.pf-blk-tools .pf-chip { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; }
+.pf-blk-tools .pf-chip .ico { width: 15px; height: 15px; }
+.pf-frame.editing .pf-block:hover { box-shadow: 0 0 0 calc(2px * var(--inv)) #c7d2fe; }
+.pf-frame.editing .pf-block.selected { box-shadow: 0 0 0 calc(3px * var(--inv)) #3b5bfd; }
+.pf-sticker.selected { outline-width: calc(2px * var(--inv)) !important; }
+.st-h { transform: scale(var(--inv)); }
+.st-rot { top: calc(-34px * var(--inv)); transform-origin: 50% 100%; }
+.st-scale { transform-origin: 0 0; }
+.st-del { transform-origin: 100% 0; }
+@media (pointer: coarse) {
+  .st-h { transform: scale(calc(var(--inv) * 1.7)); }
+  .st-rot { top: calc(-48px * var(--inv)); }
+}
+/* 모바일: 캔버스 안의 작은 도구는 숨기고 아래 막대·속성 시트로 조작 */
+@media (max-width: 860px) {
+  .pf-blk-tools, .pf-tags > .pf-chip, .pf-add-item, .pf-fields > .pf-chip, .pf-img-swap { display: none !important; }
+  .pf-frame.editing .pf-ed:hover { box-shadow: none; }
+  .pf-frame.editing .pf-ed.ed-active { box-shadow: 0 0 0 calc(2px * var(--inv)) #3b5bfd; border-radius: 4px; }
+}

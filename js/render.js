@@ -2,8 +2,12 @@
 (function () {
   const { h, $, $$ } = PF;
 
-  PF.chromeBtn = (label, fn, cls) =>
-    h('button', { class: 'pf-chrome pf-chip ' + (cls || ''), type: 'button', contenteditable: 'false', onmousedown: (e) => e.preventDefault(), onclick: (e) => { e.stopPropagation(); fn(e); } }, label);
+  PF.chromeBtn = (label, fn, cls, title) => {
+    const b = h('button', { class: 'pf-chrome pf-chip ' + (cls || ''), type: 'button', contenteditable: 'false', title: title || null, onmousedown: (e) => e.preventDefault(), onclick: (e) => { e.stopPropagation(); fn(e); } });
+    if (label && label.startsWith('@')) b.innerHTML = PF.icon(label.slice(1));
+    else b.textContent = label;
+    return b;
+  };
 
   /* ---------- 글꼴 ---------- */
   PF.fontList = function () {
@@ -147,10 +151,10 @@
         h('div', { class: 'pf-chrome pf-blk-tools', contenteditable: 'false' },
           h('span', { class: 'pf-handle', title: '끌어서 옮기기' }, '⠿'),
           h('span', { class: 'pf-blk-name' }, def.name),
-          PF.chromeBtn('↑', () => PF.moveBlock(b.id, -1)),
-          PF.chromeBtn('↓', () => PF.moveBlock(b.id, 1)),
-          PF.chromeBtn('⧉', () => PF.duplicateBlock(b.id)),
-          PF.chromeBtn('✕', () => PF.deleteBlock(b.id), 'danger')));
+          PF.chromeBtn('@up', () => PF.moveBlock(b.id, -1), '', '위로'),
+          PF.chromeBtn('@down', () => PF.moveBlock(b.id, 1), '', '아래로'),
+          PF.chromeBtn('@copy', () => PF.duplicateBlock(b.id), '', '복제'),
+          PF.chromeBtn('@trash', () => PF.deleteBlock(b.id), 'danger', '삭제')));
     }
     return el;
   }
@@ -221,6 +225,16 @@
         cleanup();
       }
     }
+    PF.commit();
+    PF.render();
+  };
+  PF.moveBlockCol = function (id, dir) {
+    const f = PF.findBlock(id);
+    if (!f) return;
+    const to = f.row.cols[f.ci + dir];
+    if (!to) return PF.toast(dir < 0 ? '왼쪽에 칸이 없어요. 속성 → “칸 추가”로 칸을 나눠 보세요' : '오른쪽에 칸이 없어요. 속성 → “칸 추가”로 칸을 나눠 보세요');
+    f.col.blocks.splice(f.bi, 1);
+    to.blocks.push(f.block);
     PF.commit();
     PF.render();
   };
@@ -364,6 +378,7 @@
     if (z === 'fit') z = Math.min(1, (stage.clientWidth - 48) / W);
     z = PF.clamp(z, 0.1, 3);
     PF.zoomScale = z;
+    f.style.setProperty('--inv', String(1 / z));
     inner.style.transform = `scale(${z})`;
     wrap.style.width = W * z + 'px';
     wrap.style.height = f.offsetHeight * z + 'px';

@@ -13,7 +13,8 @@
     el._key = key;
     el._set = (v) => (obj[key] = v);
     el._shared = !!opts.shared;
-    if (!PF.ui.preview) {
+    // 모바일은 캔버스가 작게 보이므로 직접 입력 대신 글 편집 창을 띄움
+    if (!PF.ui.preview && !PF.isMobile()) {
       el.contentEditable = 'true';
       el.spellcheck = false;
     }
@@ -147,6 +148,7 @@
   }
 
   PF.placeRichBar = function () {
+    if (tsTarget) return; // 모바일 글 편집 창 안에 고정
     if (!current || !document.contains(current) || PF.ui.preview) return bar.classList.add('hidden');
     bar.classList.remove('hidden');
     const r = current.getBoundingClientRect();
@@ -160,7 +162,103 @@
   };
 
   /* ---------- 이벤트 ---------- */
-  PF.initRichText = function (frame) {
+  /* ---------- 모바일 글 편집 창 ---------- */
+  let tsTarget = null;
+  const sheet = $('#text-sheet'), tsEd = $('#ts-editor'), tsBar = $('#ts-bar');
+  PF.openTextSheet = function (target) {
+    if (tsTarget) PF.closeTextSheet();
+    tsTarget = target;
+    tsEd.innerHTML = target.innerHTML;
+    tsEd._obj = target._obj;
+    tsEd._key = target._key;
+    tsEd._set = target._set;
+    tsEd._shared = true; // 캔버스의 같은 칸들에 바로 반영
+    tsEd.dataset.ph = target.dataset.ph || '';
+    tsEd.classList.toggle('is-empty', isEmptyHTML(tsEd));
+    const cs = getComputedStyle(target);
+    const blk = target.closest('.pf-block');
+    const bcs = blk ? getComputedStyle(blk) : null;
+    const bgc = bcs && bcs.backgroundColor !== 'rgba(0, 0, 0, 0)' ? bcs.backgroundColor : PF.project.settings.theme.card;
+    Object.assign(tsEd.style, {
+      fontFamily: cs.fontFamily, fontWeight: cs.fontWeight, fontStyle: cs.fontStyle, color: cs.color, textAlign: cs.textAlign,
+      letterSpacing: cs.letterSpacing, textTransform: cs.textTransform, background: bgc,
+      fontSize: PF.clamp(parseFloat(cs.fontSize) || 16, 15, 26) + 'px',
+    });
+    const bname = blk ? PF.BLOCKS[(PF.findBlock(blk.dataset.id) || {}).block?.type]?.name : '';
+    $('#ts-title').textContent = (bname ? bname + ' · ' : '') + (target.dataset.ph || '글 편집');
+    target.classList.add('ed-active');
+    tsBar.append(bar);
+    bar.classList.remove('hidden');
+    sheet.classList.remove('hidden');
+    PF.closeSheets && PF.closeSheets();
+    current = tsEd;
+    fitSheet();
+    tsEd.focus({ preventScroll: true });
+    const r = document.createRange();
+    r.selectNodeContents(tsEd);
+    r.collapse(false);
+    const s = getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+    saved = { range: r.cloneRange(), el: tsEd };
+    setTimeout(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 250);
+  };
+  PF.closeTextSheet = function () {
+    if (!tsTarget) return;
+    const t = tsTarget;
+    tsTarget = null;
+    t.classList.remove('ed-active');
+    sheet.classList.add('hidden');
+    document.body.append(bar);
+    bar.classList.add('hidden');
+    current = null;
+    saved = null;
+    tsEd.blur();
+    if (document.contains(t)) t.dispatchEvent(new Event('blur')); // 빈 키워드 정리 등
+    PF.commit();
+  };
+  // 화면 키보드가 올라오면 편집 창을 그 위로
+  function fitSheet() {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    sheet.style.bottom = Math.max(0, innerHeight - vv.height - vv.offsetTop) + 'px';
+    sheet.style.maxHeight = Math.max(220, vv.height - 70) + 'px';
+  }
+  if (window.visualViewport) { visualViewport.addEventListener('resize', fitSheet); visualViewport.addEventListener('scroll', fitSheet); }
+
+  PF.initRichText = function (frame0) {
+    // 캔버스에서: 모바일이면 글자를 눌렀을 때 편집 창 열기
+    frame0.addEventListener('click', (e) => {
+      if (!PF.isMobile() || PF.ui.preview) return;
+      const el = e.target.closest && e.target.closest('.pf-ed');
+      if (el && frame0.contains(el)) PF.openTextSheet(el);
+    });
+    for (const frame of [frame0, sheet]) initOn(frame, frame0);
+    document.addEventListener('selectionchange', () => {
+      const s = getSelection();
+      if (!s.rangeCount) return;
+      const n = s.anchorNode;
+      const el = n && (n.nodeType === 1 ? n : n.parentElement)?.closest('.pf-ed');
+      if (el && (frame0.contains(el) || el === tsEd)) {
+        saved = { range: s.getRangeAt(0).cloneRange(), el };
+        refreshState();
+      }
+    });
+    bar.addEventListener('mousedown', (e) => {
+      if (e.target.tagName !== 'SELECT' && e.target.tagName !== 'INPUT') e.preventDefault();
+    });
+    document.addEventListener('mousedown', (e) => {
+      if (tsTarget) return;
+      if (!bar.contains(e.target) && !(e.target.closest && e.target.closest('.pf-ed'))) {
+        current = null;
+        bar.classList.add('hidden');
+      }
+    });
+    addEventListener('resize', PF.placeRichBar);
+    PF.$('#stage').addEventListener('scroll', PF.placeRichBar, { passive: true });
+  };
+
+  function initOn(frame) {
     frame.addEventListener('input', (e) => {
       const el = e.target.closest && e.target.closest('.pf-ed');
       if (el) sync(el);
@@ -174,7 +272,7 @@
     });
     frame.addEventListener('focusout', (e) => {
       const el = e.target.closest && e.target.closest('.pf-ed');
-      if (!el) return;
+      if (!el || el === tsEd) return;
       setTimeout(() => {
         if (document.activeElement === el) return;
         if (bar.contains(document.activeElement)) return;
@@ -200,26 +298,5 @@
       const txt = (e.clipboardData || window.clipboardData).getData('text/plain');
       document.execCommand('insertText', false, txt);
     });
-    document.addEventListener('selectionchange', () => {
-      const s = getSelection();
-      if (!s.rangeCount) return;
-      const n = s.anchorNode;
-      const el = n && (n.nodeType === 1 ? n : n.parentElement)?.closest('.pf-ed');
-      if (el && frame.contains(el)) {
-        saved = { range: s.getRangeAt(0).cloneRange(), el };
-        refreshState();
-      }
-    });
-    bar.addEventListener('mousedown', (e) => {
-      if (e.target.tagName !== 'SELECT' && e.target.tagName !== 'INPUT') e.preventDefault();
-    });
-    document.addEventListener('mousedown', (e) => {
-      if (!bar.contains(e.target) && !(e.target.closest && e.target.closest('.pf-ed'))) {
-        current = null;
-        bar.classList.add('hidden');
-      }
-    });
-    addEventListener('resize', PF.placeRichBar);
-    PF.$('#stage').addEventListener('scroll', PF.placeRichBar, { passive: true });
-  };
+  }
 })();

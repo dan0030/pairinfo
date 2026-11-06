@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
 <title>페어틀 메이커</title>
 <!-- 링크 공유 미리보기 문구 -->
 <meta name="description" content="페어틀 메이커">
@@ -19,48 +20,62 @@
 </head>
 <body>
 <header class="topbar">
-  <button class="icon-btn only-mobile" data-act="toggle-left" title="패널">☰</button>
-  <div class="brand">PAIR<b>FRAME</b><span>페어틀 메이커</span></div>
-  <div class="topbar-group">
-    <button class="btn" data-act="library">내 페어틀</button>
-    <button class="btn" data-act="new">새로 만들기</button>
-    <button class="icon-btn" data-act="undo" title="되돌리기 (Ctrl+Z)">↶</button>
-    <button class="icon-btn" data-act="redo" title="다시하기 (Ctrl+Shift+Z)">↷</button>
-  </div>
-  <div class="topbar-group grow-gap">
-    <div class="zoom">
-      <button class="icon-btn" data-act="zoom-out" title="축소">−</button>
-      <button class="btn ghost" data-act="zoom-fit" id="zoom-label" title="화면에 맞추기">맞춤</button>
-      <button class="icon-btn" data-act="zoom-in" title="확대">+</button>
-    </div>
+  <div class="tb-left">
+    <div class="brand" title="페어틀 메이커">PAIR<b>FRAME</b></div>
+    <button class="proj-btn" data-act="library" title="내 페어틀 목록">
+      <i data-icon="folder"></i><span class="proj-name" id="proj-name">내 페어틀</span><i data-icon="chev" class="chev"></i>
+    </button>
     <span class="save-status" id="save-status"></span>
-    <label class="toggle"><input type="checkbox" id="preview-toggle"><span>미리보기</span></label>
   </div>
-  <div class="topbar-group">
-    <button class="btn" data-act="import">불러오기</button>
-    <button class="btn" data-act="export-json">저장 파일</button>
-    <button class="btn primary" data-act="export-png">PNG 내보내기</button>
-    <button class="icon-btn only-mobile" data-act="toggle-right" title="속성">⚙</button>
+  <div class="tb-center">
+    <button class="icon-btn" data-act="undo" title="되돌리기 (Ctrl+Z)"><i data-icon="undo"></i></button>
+    <button class="icon-btn" data-act="redo" title="다시하기 (Ctrl+Shift+Z)"><i data-icon="redo"></i></button>
+    <span class="tb-sep desk"></span>
+    <div class="zoom desk">
+      <button class="icon-btn sm" data-act="zoom-out" title="축소"><i data-icon="minus"></i></button>
+      <button class="zoom-label" data-act="zoom-fit" id="zoom-label" title="화면에 맞추기">맞춤</button>
+      <button class="icon-btn sm" data-act="zoom-in" title="확대"><i data-icon="plus"></i></button>
+    </div>
+  </div>
+  <div class="tb-right">
+    <label class="switch desk" title="편집 표시 없이 보기"><input type="checkbox" id="preview-toggle"><span class="sw"></span><span>미리보기</span></label>
+    <div class="menu-wrap">
+      <button class="btn" data-act="menu-file" title="파일"><i data-icon="file"></i><span class="desk">파일</span></button>
+      <div class="menu hidden" id="file-menu">
+        <button data-act="new"><i data-icon="plus"></i>새 페어틀 만들기</button>
+        <button data-act="library"><i data-icon="folder"></i>내 페어틀 목록</button>
+        <hr>
+        <button data-act="import"><i data-icon="upload"></i>저장 파일 불러오기</button>
+        <button data-act="export-json"><i data-icon="save"></i>저장 파일로 백업 (.json)</button>
+        <hr class="mob">
+        <button class="mob" data-act="zoom-in"><i data-icon="plus"></i>크게 보기</button>
+        <button class="mob" data-act="zoom-out"><i data-icon="minus"></i>작게 보기</button>
+        <button class="mob" data-act="zoom-fit"><i data-icon="fit"></i>화면에 맞추기</button>
+      </div>
+    </div>
+    <button class="btn primary" data-act="export-png" title="PNG로 저장"><i data-icon="download"></i><span class="desk">PNG 저장</span><span class="mob">PNG</span></button>
   </div>
 </header>
 
 <div class="workspace">
   <aside class="panel left" id="panel-left">
-    <nav class="tabs">
-      <button class="tab on" data-tab="blocks">블록</button>
-      <button class="tab" data-tab="design">디자인</button>
-      <button class="tab" data-tab="stickers">스티커</button>
+    <div class="sheet-grip mob"></div>
+    <div class="sheet-head mob"><b id="sheet-title-left">블록 추가</b><button class="icon-btn" data-act="close-sheets" title="닫기"><i data-icon="x"></i></button></div>
+    <nav class="tabs desk-flex">
+      <button class="tab on" data-tab="blocks"><i data-icon="grid"></i>블록</button>
+      <button class="tab" data-tab="design"><i data-icon="palette"></i>디자인</button>
+      <button class="tab" data-tab="stickers"><i data-icon="star"></i>스티커</button>
     </nav>
     <div class="tab-body" data-body="blocks">
-      <p class="hint">블록을 누르면 선택한 블록 아래에 추가됩니다. 선택이 없으면 맨 아래에 새 줄로 들어가요. 캔버스의 <b>⠿</b> 손잡이를 끌어서 위치를 옮길 수 있어요.</p>
+      <p class="hint">블록을 누르면 선택한 블록 아래에 들어가요. 선택한 게 없으면 맨 아래에 새 줄로 추가돼요.</p>
       <div class="block-palette" id="block-palette"></div>
     </div>
     <div class="tab-body hidden" data-body="design" id="design-body"></div>
     <div class="tab-body hidden" data-body="stickers">
-      <p class="hint">배경이 투명한 PNG를 올리면 스티커 보관함에 들어갑니다. 누르면 페어틀에 붙어요. 크기·회전은 모서리 손잡이나 오른쪽 패널에서 조절하세요.</p>
-      <label class="btn wide primary file-btn">스티커 이미지 올리기<input type="file" accept="image/*" multiple id="sticker-upload" hidden></label>
+      <p class="hint">배경이 투명한 PNG를 올리면 보관함에 담겨요. 보관함의 스티커를 누르면 페어틀에 붙어요.</p>
+      <label class="btn wide primary file-btn"><i data-icon="upload"></i>스티커 이미지 올리기<input type="file" accept="image/*" multiple id="sticker-upload" hidden></label>
       <div class="sticker-lib" id="sticker-lib"></div>
-      <label class="check"><input type="checkbox" id="sticker-lock"> 스티커 잠그기 (글 편집할 때 방해되지 않게)</label>
+      <label class="check"><input type="checkbox" id="sticker-lock"> 스티커 잠그기 <span class="muted">(글 편집할 때 방해되지 않게)</span></label>
     </div>
   </aside>
 
@@ -73,8 +88,33 @@
   </main>
 
   <aside class="panel right" id="panel-right">
+    <div class="sheet-grip mob"></div>
+    <div class="sheet-head mob"><b>속성</b><button class="icon-btn" data-act="close-sheets" title="닫기"><i data-icon="x"></i></button></div>
     <div id="inspector"></div>
   </aside>
+</div>
+
+<!-- 모바일: 선택한 블록 조작 막대 -->
+<div class="selbar hidden" id="selbar"></div>
+
+<!-- 모바일: 아래 탭 -->
+<nav class="mtabs mob-flex" id="mtabs">
+  <button data-sheet="blocks"><i data-icon="grid"></i><span>블록</span></button>
+  <button data-sheet="design"><i data-icon="palette"></i><span>디자인</span></button>
+  <button data-sheet="stickers"><i data-icon="star"></i><span>스티커</span></button>
+  <button data-sheet="props"><i data-icon="sliders"></i><span>속성</span></button>
+  <button data-act="toggle-preview" id="m-preview"><i data-icon="eye"></i><span>미리보기</span></button>
+</nav>
+<div class="sheet-backdrop hidden" id="sheet-backdrop" data-act="close-sheets"></div>
+
+<!-- 모바일: 글 편집 창 -->
+<div class="text-sheet hidden" id="text-sheet">
+  <div class="ts-head">
+    <span class="ts-title" id="ts-title">글 편집</span>
+    <button class="btn primary sm" data-act="close-text">완료</button>
+  </div>
+  <div class="ts-bar" id="ts-bar"></div>
+  <div class="ts-body"><div class="ts-editor pf-ed" id="ts-editor" contenteditable="true" spellcheck="false"></div></div>
 </div>
 
 <div class="rt-bar hidden" id="rt-bar"></div>
