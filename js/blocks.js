@@ -251,9 +251,11 @@
 
   B.gallery = {
     name: '이미지 모음', icon: '▦', desc: '상징물·분위기 이미지 여러 장',
-    create: () => ({ title: '상징물과 분위기', sub: 'SYMBOL & MOOD', showHead: true, ratio: '16/9', note: '', items: [0, 1, 2].map(() => ({ img: null, caption: '캡션' })) }),
+    create: () => ({ title: '상징물과 분위기', sub: 'SYMBOL & MOOD', showHead: true, showCaption: true, showNote: true, ratio: '16/9', note: '', items: [0, 1, 2].map(() => ({ img: null, caption: '캡션' })) }),
     options: [
       { key: 'showHead', label: '제목 보이기', type: 'check' },
+      { key: 'showCaption', label: '이미지 캡션 보이기', type: 'check', def: true },
+      { key: 'showNote', label: '아래 설명 한 줄 보이기', type: 'check', def: true },
       ...sizeOpts('이미지', 'ratio', 'imgH', null, null, RATIOS.filter((r) => r[0] !== 'auto')),
     ],
     list: { key: 'items', label: '이미지', make: () => ({ img: null, caption: '캡션' }), title: (it, i) => '이미지 ' + (i + 1) },
@@ -261,8 +263,8 @@
     render(b) {
       const d = b.data;
       const grid = h('div', { class: 'pf-gallery', style: { gridTemplateColumns: `repeat(${Math.max(1, d.items.length)}, 1fr)` } });
-      d.items.forEach((it) => grid.append(h('figure', {}, PF.imgSlot(it.img, (r) => (it.img = r), { cls: 'pf-pic', ratio: d.ratio, h: d.imgH, ph: '이미지' }), ed(it, 'caption', { cls: 'pf-caption strong', ph: '캡션' }))));
-      return h('div', {}, d.showHead ? heading(d) : null, grid, ed(d, 'note', { cls: 'pf-caption center muted', ph: '설명 한 줄 (비워두면 안 보여요)' }), addItemBtn(d.items, () => ({ img: null, caption: '캡션' }), '+ 이미지 칸'));
+      d.items.forEach((it) => grid.append(h('figure', {}, PF.imgSlot(it.img, (r) => (it.img = r), { cls: 'pf-pic', ratio: d.ratio, h: d.imgH, ph: '이미지' }), d.showCaption !== false ? ed(it, 'caption', { cls: 'pf-caption strong', ph: '캡션' }) : null)));
+      return h('div', {}, d.showHead ? heading(d) : null, grid, d.showNote !== false ? ed(d, 'note', { cls: 'pf-caption center muted', ph: '설명 한 줄 (비워두면 안 보여요)' }) : null, addItemBtn(d.items, () => ({ img: null, caption: '캡션' }), '+ 이미지 칸'));
     },
   };
 
