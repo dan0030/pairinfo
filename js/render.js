@@ -87,7 +87,13 @@
     const el = h('div', { class: 'pf-img ' + (o.cls || '') });
     if (o.style) Object.assign(el.style, o.style);
     const src = ref && PF.assets[ref.id];
-    if (o.ratio && o.ratio !== 'auto') el.style.aspectRatio = o.ratio;
+    if (o.ratio === 'custom') { el.style.height = (o.h || 300) + 'px'; el.classList.add('custom-h'); }
+    else if (o.ratio && o.ratio !== 'auto') el.style.aspectRatio = o.ratio;
+    if (o.w != null && o.w < 100) {
+      el.style.width = o.w + '%';
+      el.style.marginLeft = o.align === 'left' ? '0' : 'auto';
+      el.style.marginRight = o.align === 'right' ? '0' : 'auto';
+    }
     else if (!src) el.style.aspectRatio = '4/3';
     if (src) {
       const x = ref.x ?? 50, y = ref.y ?? 50, z = ref.zoom ?? 1;

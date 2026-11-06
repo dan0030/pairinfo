@@ -9,12 +9,41 @@
   function row(label, ...ctrl) {
     return h('div', { class: 'f-row' }, h('label', { class: 'f-lbl' }, label), h('div', { class: 'f-ctrl' }, ...ctrl));
   }
+  /* 슬라이드 바 + 숫자 직접 입력 칸
+     fmt(v) 가 '30px' · '50%' · '15°' · '1.20×' 같은 문자열이면 그 단위를 숫자 칸 옆에 붙임.
+     0~1 값을 %로 보여주는 경우(투명도 등)는 숫자 칸에 0~100으로 보여줌 */
   function range(obj, key, min, max, step, onChange, fmt) {
-    const out = h('span', { class: 'f-val' }, (fmt || String)(obj[key]));
-    const inp = h('input', { type: 'range', min, max, step: step || 1, value: obj[key] ?? min });
-    inp.addEventListener('input', () => { obj[key] = +inp.value; out.textContent = (fmt || String)(obj[key]); (onChange || live)(); });
+    step = step || 1;
+    const unit = fmt ? String(fmt(max)).replace(/[-\d.,\s]/g, '') : '';
+    const k = unit === '%' && max <= 1 ? 100 : 1;
+    const dec = Math.max(0, (String(step * k).split('.')[1] || '').length);
+    const show = (v) => (Number(v) * k).toFixed(dec).replace(/\.0+$/, '');
+    if (obj[key] == null || isNaN(obj[key])) obj[key] = min;
+    const inp = h('input', { type: 'range', min, max, step, value: obj[key] });
+    const num = h('input', { type: 'number', class: 'f-num-in', min: min * k, max: max * k, step: step * k, value: show(obj[key]), inputmode: dec ? 'decimal' : 'numeric' });
+    const apply = (v, commit) => {
+      obj[key] = v;
+      inp.value = v;
+      (onChange || live)();
+      if (commit) PF.commit();
+    };
+    inp.addEventListener('input', () => { num.value = show(inp.value); apply(+inp.value); });
     inp.addEventListener('change', () => PF.commit());
-    return h('div', { class: 'f-range' }, inp, out);
+    num.addEventListener('input', () => {
+      const v = parseFloat(num.value);
+      if (!isNaN(v) && v * 1 >= min * k && v <= max * k) apply(v / k);
+    });
+    const fix = () => {
+      let v = parseFloat(num.value);
+      if (isNaN(v)) v = obj[key] * k;
+      v = PF.clamp(v / k, min, max);
+      num.value = show(v);
+      apply(v, true);
+    };
+    num.addEventListener('change', fix);
+    num.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); fix(); num.blur(); } });
+    num.addEventListener('focus', () => num.select());
+    return h('div', { class: 'f-range' }, inp, h('label', { class: 'f-num-wrap' }, num, unit ? h('span', { class: 'f-unit' }, unit) : null));
   }
   function check(obj, key, label, onChange) {
     const inp = h('input', { type: 'checkbox' });
@@ -193,11 +222,22 @@
     const b = f.block, def = PF.BLOCKS[b.type];
     box.append(h('div', { class: 'insp-head' }, h('span', { class: 'insp-ico' }, def.icon), h('div', {}, h('b', {}, def.name), h('div', { class: 'muted sm' }, def.desc))));
 
-    const opts = (def.options || []).map((o) =>
-      o.type === 'check' ? check(b.data, o.key, o.label)
-        : o.type === 'color' ? row(o.label, color(b.data, o.key, null, true))
-        : o.type === 'select' ? row(o.label, select(b.data, o.key, o.choices))
-          : row(o.label, range(b.data, o.key, o.min, o.max, o.step)));
+    const D = b.data;
+    // 새로 생긴 옵션의 기본값 채우기 (예전에 만든 블록 호환)
+    (def.options || []).forEach((o) => { if (o.def !== undefined && D[o.key] === undefined) D[o.key] = o.def; });
+    const pickCustom = (o) => () => {
+      // “직접 정하기”를 처음 고르면 지금 보이는 높이에서 시작
+      if (o.custom && D[o.key] === 'custom' && !D[o.custom]) {
+        const el = PF.frameEl.querySelector(`.pf-block[data-id="${b.id}"] .pf-img`);
+        D[o.custom] = el ? Math.round(el.offsetHeight) || 300 : 300;
+      }
+      full();
+    };
+    const opts = (def.options || []).filter((o) => !o.when || o.when(D)).map((o) =>
+      o.type === 'check' ? check(D, o.key, o.label)
+        : o.type === 'color' ? row(o.label, color(D, o.key, null, true))
+        : o.type === 'select' ? row(o.label, select(D, o.key, o.choices, pickCustom(o)))
+          : row(o.label, range(D, o.key, o.min, o.max, o.step, null, o.unit ? (v) => v + o.unit : null)));
     if (opts.length) box.append(section('블록 옵션', ...opts));
 
     const imgs = def.images ? def.images(b) : [];

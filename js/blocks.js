@@ -8,7 +8,16 @@
   const who = (w) => (w === 'B' ? 'B' : 'A');
 
   const WHO_CHOICES = [['A', '캐릭터 A'], ['B', '캐릭터 B']];
-  const RATIOS = [['auto', '원본 비율'], ['1/1', '1:1'], ['4/3', '4:3'], ['3/4', '3:4'], ['6/5', '6:5'], ['16/9', '16:9'], ['9/16', '9:16'], ['3/1', '3:1 (와이드)']];
+  const RATIOS = [['custom', '직접 정하기 (높이 조절)'], ['auto', '원본 비율'], ['1/1', '1:1'], ['4/3', '4:3'], ['3/4', '3:4'], ['6/5', '6:5'], ['16/9', '16:9'], ['9/16', '9:16'], ['3/1', '3:1 (와이드)']];
+  const isCustom = (k) => (d) => d[k] === 'custom';
+  /* 이미지 칸 크기 옵션: 비율(직접 정하기) → 높이, 너비(%), 정렬 */
+  const sizeOpts = (label, ratioKey = 'ratio', hKey = 'imgH', wKey = 'imgW', aKey = 'imgAlign', ratios = RATIOS) => [
+    { key: ratioKey, label: label + ' 비율', type: 'select', choices: ratios, custom: hKey },
+    { key: hKey, label: label + ' 높이', type: 'range', min: 30, max: 1200, step: 1, unit: 'px', when: isCustom(ratioKey) },
+    wKey ? { key: wKey, label: label + ' 너비', type: 'range', min: 10, max: 100, step: 1, unit: '%', def: 100 } : null,
+    wKey ? { key: aKey, label: label + ' 정렬', type: 'select', choices: [['center', '가운데'], ['left', '왼쪽'], ['right', '오른쪽']], def: 'center' } : null,
+  ].filter(Boolean);
+  const sizeOf = (d, ratioKey = 'ratio', hKey = 'imgH', wKey = 'imgW', aKey = 'imgAlign') => ({ ratio: d[ratioKey], h: d[hKey], w: wKey ? d[wKey] : null, align: aKey ? d[aKey] : null });
 
   function heading(d, opts = {}) {
     const wrap = h('div', { class: 'pf-head' + (opts.cls ? ' ' + opts.cls : '') });
@@ -83,7 +92,7 @@
     defStyle: 'accent',
     options: [
       { key: 'who', label: '캐릭터', type: 'select', choices: WHO_CHOICES },
-      { key: 'ratio', label: '두상 비율', type: 'select', choices: RATIOS },
+      ...sizeOpts('두상'),
       { key: 'showImg', label: '두상 이미지', type: 'check' },
       { key: 'showTags', label: '프로필 키워드', type: 'check' },
       { key: 'showProfile', label: '간략 프로필 글', type: 'check' },
@@ -99,7 +108,7 @@
       const el = h('div', { class: 'pf-char who-' + w + ' tags-' + (d.tagStyle || 'default') });
       if (d.tagBg) el.style.setProperty('--tag-bg', d.tagBg);
       if (d.tagText) el.style.setProperty('--tag-text', d.tagText);
-      if (d.showImg) el.append(PF.imgSlot(chars()[w].img, (r) => (chars()[w].img = r), { cls: 'pf-char-img', ratio: d.ratio, ph: '두상 이미지' }));
+      if (d.showImg) el.append(PF.imgSlot(chars()[w].img, (r) => (chars()[w].img = r), Object.assign({ cls: 'pf-char-img', ph: '두상 이미지' }, sizeOf(d))));
       el.append(ed(d, 'label', { cls: 'pf-label acc', ph: 'CHARACTER' }), charName(w, 'pf-name'));
       if (d.showTags) el.append(tagList(d.tags, { cls: 'pill' }));
       if (d.showProfile) el.append(ed(d, 'profile', { cls: 'pf-body pf-profile', ph: '간략 프로필 (나이, 소속, 성격 등)' }));
@@ -122,7 +131,7 @@
     options: [
       { key: 'showImg', label: '두상 이미지', type: 'check' },
       { key: 'shape', label: '두상 모양', type: 'select', choices: [['circle', '원형'], ['rounded', '둥근 사각'], ['square', '사각']] },
-      { key: 'avatar', label: '두상 크기', type: 'range', min: 60, max: 280, step: 2 },
+      { key: 'avatar', label: '두상 크기', type: 'range', min: 30, max: 400, step: 1, unit: 'px' },
       { key: 'noImg', label: '두상이 없을 때', type: 'select', choices: [['initial', '이름 첫 글자'], ['symbol', '직접 쓴 글자·기호'], ['blank', '빈 원만'], ['hide', '원 숨기고 이름만']] },
       { key: 'noImgFill', label: '빈 원 색', type: 'select', choices: [['tint', '연한 캐릭터 색'], ['solid', '캐릭터 색 (흰 글자)'], ['line', '테두리만']] },
       { key: 'dashed', label: '점선 화살표', type: 'check' },
@@ -228,14 +237,14 @@
     name: '페어 이미지', icon: '▣', desc: '두 사람이 함께 있는 이미지',
     create: () => ({ img: null, ratio: '4/3', caption: '', showCaption: true }),
     options: [
-      { key: 'ratio', label: '비율', type: 'select', choices: RATIOS },
+      ...sizeOpts('이미지'),
       { key: 'showCaption', label: '캡션', type: 'check' },
     ],
     images: (b) => [{ label: '이미지', get: () => b.data.img, set: (r) => (b.data.img = r) }],
     render(b) {
       const d = b.data;
       return h('div', { class: 'pf-image' },
-        PF.imgSlot(d.img, (r) => (d.img = r), { cls: 'pf-pic', ratio: d.ratio, ph: '페어 이미지' }),
+        PF.imgSlot(d.img, (r) => (d.img = r), Object.assign({ cls: 'pf-pic', ph: '페어 이미지' }, sizeOf(d))),
         d.showCaption ? ed(d, 'caption', { cls: 'pf-caption', ph: '캡션' }) : null);
     },
   };
@@ -245,14 +254,14 @@
     create: () => ({ title: '상징물과 분위기', sub: 'SYMBOL & MOOD', showHead: true, ratio: '16/9', note: '', items: [0, 1, 2].map(() => ({ img: null, caption: '캡션' })) }),
     options: [
       { key: 'showHead', label: '제목 보이기', type: 'check' },
-      { key: 'ratio', label: '비율', type: 'select', choices: RATIOS.filter((r) => r[0] !== 'auto') },
+      ...sizeOpts('이미지', 'ratio', 'imgH', null, null, RATIOS.filter((r) => r[0] !== 'auto')),
     ],
     list: { key: 'items', label: '이미지', make: () => ({ img: null, caption: '캡션' }), title: (it, i) => '이미지 ' + (i + 1) },
     images: (b) => b.data.items.map((it, i) => ({ label: '이미지 ' + (i + 1), get: () => it.img, set: (r) => (it.img = r) })),
     render(b) {
       const d = b.data;
       const grid = h('div', { class: 'pf-gallery', style: { gridTemplateColumns: `repeat(${Math.max(1, d.items.length)}, 1fr)` } });
-      d.items.forEach((it) => grid.append(h('figure', {}, PF.imgSlot(it.img, (r) => (it.img = r), { cls: 'pf-pic', ratio: d.ratio, ph: '이미지' }), ed(it, 'caption', { cls: 'pf-caption strong', ph: '캡션' }))));
+      d.items.forEach((it) => grid.append(h('figure', {}, PF.imgSlot(it.img, (r) => (it.img = r), { cls: 'pf-pic', ratio: d.ratio, h: d.imgH, ph: '이미지' }), ed(it, 'caption', { cls: 'pf-caption strong', ph: '캡션' }))));
       return h('div', {}, d.showHead ? heading(d) : null, grid, ed(d, 'note', { cls: 'pf-caption center muted', ph: '설명 한 줄 (비워두면 안 보여요)' }), addItemBtn(d.items, () => ({ img: null, caption: '캡션' }), '+ 이미지 칸'));
     },
   };
@@ -295,6 +304,9 @@
     options: [
       { key: 'layout', label: '배치', type: 'select', choices: [['side', '커버 옆에 가사'], ['stack', '가사를 아래로']] },
       { key: 'showPlayer', label: '재생바 장식', type: 'check' },
+      { key: 'coverW', label: '커버 칸 너비', type: 'range', min: 12, max: 70, step: 1, unit: '%', def: 34 },
+      { key: 'coverRatio', label: '커버 비율', type: 'select', choices: RATIOS.filter((r) => r[0] !== 'auto'), custom: 'coverH', def: '1/1' },
+      { key: 'coverH', label: '커버 높이', type: 'range', min: 30, max: 1200, step: 1, unit: 'px', when: isCustom('coverRatio') },
     ],
     images: (b) => [{ label: '앨범 커버', get: () => b.data.cover, set: (r) => (b.data.cover = r) }],
     render(b) {
@@ -305,8 +317,8 @@
         ed(d, 'artist', { cls: 'pf-body muted', ph: '아티스트' }),
         d.showPlayer ? h('div', { class: 'pf-player' }, h('span', { class: 'pf-ico' }, '◀◀'), h('span', { class: 'pf-ico play' }, '❚❚'), h('span', { class: 'pf-ico' }, '▶▶'), h('div', { class: 'pf-bar' }, h('i'))) : null);
       const lyr = ed(d, 'lyrics', { cls: 'pf-lyrics', ph: '가사' });
-      return h('div', { class: 'pf-music layout-' + d.layout },
-        PF.imgSlot(d.cover, (r) => (d.cover = r), { cls: 'pf-cover', ratio: '1/1', ph: '앨범 커버' }),
+      return h('div', { class: 'pf-music layout-' + d.layout, style: { gridTemplateColumns: `minmax(80px, ${d.coverW ?? 34}%) 1fr` } },
+        PF.imgSlot(d.cover, (r) => (d.cover = r), { cls: 'pf-cover', ratio: d.coverRatio || '1/1', h: d.coverH, ph: '앨범 커버' }),
         h('div', { class: 'pf-music-main' }, info, d.layout === 'side' ? lyr : null),
         d.layout === 'stack' ? lyr : null);
     },
@@ -317,6 +329,7 @@
     create: () => ({ showAvatar: true, showName: true, items: [{ who: 'A', text: '대사를 적어 주세요.' }, { who: 'B', text: '대사를 적어 주세요.' }] }),
     options: [
       { key: 'showAvatar', label: '두상 보이기', type: 'check' },
+      { key: 'avatar', label: '두상 크기', type: 'range', min: 24, max: 160, step: 1, unit: 'px', def: 52, when: (d) => d.showAvatar },
       { key: 'showName', label: '이름 보이기', type: 'check' },
     ],
     list: { key: 'items', label: '대사', make: () => ({ who: 'A', text: '' }), title: (it) => it.text.replace(/<[^>]+>/g, '').slice(0, 14) || '(빈 대사)', who: true, whoBoth: false },
@@ -327,7 +340,7 @@
         const w = who(it.who);
         box.append(
           h('div', { class: 'pf-quote who-' + w + (w === 'B' ? ' right' : '') },
-            d.showAvatar ? PF.imgSlot(chars()[w].img, (r) => (chars()[w].img = r), { cls: 'pf-avatar sm shape-circle', ratio: '1/1', ph: '' }) : null,
+            d.showAvatar ? PF.imgSlot(chars()[w].img, (r) => (chars()[w].img = r), { cls: 'pf-avatar sm shape-circle', ratio: '1/1', ph: '', style: { width: (d.avatar ?? 52) + 'px' } }) : null,
             h('div', { class: 'pf-quote-main' },
               d.showName ? charName(w, 'pf-small strong acc') : null,
               ed(it, 'text', { cls: 'pf-bubble', ph: '대사' }))));
