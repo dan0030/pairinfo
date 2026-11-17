@@ -358,3 +358,9 @@ body.is-dragging { cursor: grabbing; user-select: none; }
 .grad-ed:has(.grad-prev) { padding: 4px 10px 6px 0; border-left: 3px solid var(--ui-pri-soft); padding-left: 2px; }
 .rt-btn.grad-btn { background: linear-gradient(90deg, #3b5bfd, #e9579b); }
 .rt-btn.grad-btn:hover { filter: brightness(1.1); background: linear-gradient(90deg, #3b5bfd, #e9579b); }
+
+/* 되돌리기 · 다시하기 */
+.icon-btn:disabled { opacity: .32; cursor: default; background: transparent !important; }
+.hist-btn { width: auto; padding: 0 10px 0 8px; gap: 5px; display: inline-flex; align-items: center; font-weight: 600; font-size: 13px; }
+.hist-lbl { white-space: nowrap; }
+@media (max-width: 1240px) { .hist-lbl { display: none; } .hist-btn { width: var(--ui-h); padding: 0; justify-content: center; } }

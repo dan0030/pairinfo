@@ -163,40 +163,88 @@
 
   /* ---------- 되돌리기 ---------- */
   const hist = { undo: [], redo: [], last: null };
+  const HIST_MAX = 150;
+  let commitTimer = 0, pending = false;
+  /* 되돌리기 · 다시하기 버튼 상태 */
+  PF.updateHistBtns = function () {
+    const u = hist.undo.length > 0 || pending, r = hist.redo.length > 0 && !pending;
+    document.querySelectorAll('[data-act="undo"]').forEach((b) => { b.disabled = !u; b.title = u ? '되돌리기 (Ctrl+Z) · ' + (hist.undo.length + (pending ? 1 : 0)) + '단계' : '되돌릴 작업이 없어요'; });
+    document.querySelectorAll('[data-act="redo"]').forEach((b) => { b.disabled = !r; b.title = r ? '다시하기 (Ctrl+Shift+Z) · ' + hist.redo.length + '단계' : '다시 할 작업이 없어요'; });
+  };
   PF.commit = function () {
+    clearTimeout(commitTimer);
+    pending = false;
     const snap = JSON.stringify(PF.project);
-    if (snap === hist.last) return;
+    if (snap === hist.last) return PF.updateHistBtns();
     if (hist.last != null) hist.undo.push(hist.last);
-    if (hist.undo.length > 80) hist.undo.shift();
+    if (hist.undo.length > HIST_MAX) hist.undo.shift();
     hist.redo.length = 0;
     hist.last = snap;
     PF.saveSoon();
+    PF.updateHistBtns();
   };
-  let commitTimer = 0;
   PF.commitSoon = () => {
     clearTimeout(commitTimer);
+    pending = true;
     commitTimer = setTimeout(PF.commit, 500);
+    PF.updateHistBtns();
   };
   PF.resetHistory = () => {
+    clearTimeout(commitTimer);
+    pending = false;
     hist.undo.length = hist.redo.length = 0;
     hist.last = JSON.stringify(PF.project);
+    PF.updateHistBtns();
   };
+  function restoreSnap(snap, msg) {
+    // 글 편집 창 · 선택은 옛 화면을 가리키므로 닫고 다시 그림
+    if (PF.closeTextSheet) PF.closeTextSheet(true);
+    if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
+    PF.project = JSON.parse(snap);
+    PF.afterLoad();
+    PF.updateHistBtns();
+    PF.toast(msg, 1100);
+  }
   PF.undo = function () {
-    clearTimeout(commitTimer);
     PF.commit();
-    if (!hist.undo.length) return;
+    if (!hist.undo.length) return PF.toast('더 되돌릴 작업이 없어요', 1200);
     hist.redo.push(hist.last);
     hist.last = hist.undo.pop();
-    PF.project = JSON.parse(hist.last);
-    PF.afterLoad();
+    restoreSnap(hist.last, '↶ 되돌렸어요');
   };
   PF.redo = function () {
-    if (!hist.redo.length) return;
+    if (pending) PF.commit();
+    if (!hist.redo.length) return PF.toast('다시 할 작업이 없어요', 1200);
     hist.undo.push(hist.last);
     hist.last = hist.redo.pop();
-    PF.project = JSON.parse(hist.last);
-    PF.afterLoad();
+    restoreSnap(hist.last, '↷ 다시 했어요');
   };
+
+  /* ---------- 뒤로가기: 열린 창(패널 · 글 편집 · 목록 · 메뉴)부터 닫기 ----------
+     창을 열 때 브라우저 기록에 한 칸을 넣어 두고, 뒤로가기를 누르면 사이트를 떠나지 않고 창만 닫음 */
+  let backPushed = false, backSilent = false;
+  PF.backPush = function () {
+    if (backPushed) return;
+    backPushed = true;
+    try { history.pushState({ pf: 'overlay' }, ''); } catch (e) {}
+  };
+  // 창을 버튼으로 닫았을 때: 다른 창이 남아 있지 않으면 넣어 둔 기록 한 칸을 정리
+  PF.backPop = function () {
+    if (!backPushed || backSilent) return;
+    setTimeout(() => {
+      if (!backPushed || (PF.anyOverlayOpen && PF.anyOverlayOpen())) return;
+      backPushed = false;
+      backSilent = true;
+      history.back();
+    }, 0);
+  };
+  addEventListener('popstate', () => {
+    if (backSilent) { backSilent = false; return; }
+    if (!backPushed) return;
+    backPushed = false;
+    backSilent = true; // 아래에서 창을 닫으며 다시 backPop 이 불리지 않게
+    try { PF.closeAllOverlays && PF.closeAllOverlays(); } finally { backSilent = false; }
+  });
 
   /* ---------- IndexedDB: 여러 페어틀 자동 저장 ----------
      kv       : 'current' → 지금 열린 페어틀 id

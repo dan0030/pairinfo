@@ -237,6 +237,7 @@
     sheet.classList.remove('hidden');
     PF.closeSheets && PF.closeSheets();
     current = tsEd;
+    PF.backPush();
     fitSheet();
     tsEd.focus({ preventScroll: true });
     const r = document.createRange();
@@ -248,7 +249,7 @@
     saved = { range: r.cloneRange(), el: tsEd };
     setTimeout(() => target.scrollIntoView({ block: 'center', behavior: 'smooth' }), 250);
   };
-  PF.closeTextSheet = function () {
+  PF.closeTextSheet = function (noCommit) {
     if (!tsTarget) return;
     const t = tsTarget;
     tsTarget = null;
@@ -259,8 +260,11 @@
     current = null;
     saved = null;
     tsEd.blur();
-    if (document.contains(t)) t.dispatchEvent(new Event('blur')); // 빈 키워드 정리 등
-    PF.commit();
+    if (!noCommit) {
+      if (document.contains(t)) t.dispatchEvent(new Event('blur')); // 빈 키워드 정리 등
+      PF.commit();
+    }
+    PF.backPop();
   };
   // 화면 키보드가 올라오면 편집 창을 그 위로
   function fitSheet() {

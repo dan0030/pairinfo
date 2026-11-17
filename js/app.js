@@ -41,8 +41,13 @@
     c.className = 'modal-card ' + (cls || '');
     c.replaceChildren(...[].concat(content));
     m.classList.remove('hidden');
+    if (PF.meta) PF.backPush(); // 첫 실행의 템플릿 고르기 창은 뒤로가기로 닫지 않음
   }
-  const closeModal = () => $('#modal').classList.add('hidden');
+  const closeModal = () => {
+    if ($('#modal').classList.contains('hidden')) return;
+    $('#modal').classList.add('hidden');
+    PF.backPop();
+  };
   $('#modal').addEventListener('mousedown', (e) => { if (e.target.id === 'modal' && PF.meta) closeModal(); });
 
   function templateModal(first) {
@@ -238,13 +243,26 @@
     PF.ui.sheet = name;
     $('#sheet-backdrop').classList.remove('hidden');
     $$('#mtabs [data-sheet]').forEach((b) => b.classList.toggle('on', b.dataset.sheet === name));
+    PF.backPush();
+  };
+  /* 열린 창이 있는지 · 모두 닫기 (뒤로가기용) */
+  PF.anyOverlayOpen = () =>
+    !$('#modal').classList.contains('hidden') || !$('#text-sheet').classList.contains('hidden') ||
+    $('#panel-left').classList.contains('open') || $('#panel-right').classList.contains('open') || !$('#file-menu').classList.contains('hidden');
+  PF.closeAllOverlays = function () {
+    $('#file-menu').classList.add('hidden');
+    if (PF.closeTextSheet) PF.closeTextSheet();
+    closeModal();
+    PF.closeSheets();
   };
   PF.closeSheets = function () {
     $('#panel-left').classList.remove('open');
     $('#panel-right').classList.remove('open');
     $('#sheet-backdrop').classList.add('hidden');
     $$('#mtabs [data-sheet]').forEach((b) => b.classList.remove('on'));
+    const was = PF.ui.sheet;
     PF.ui.sheet = null;
+    if (was) PF.backPop();
   };
   $$('#mtabs [data-sheet]').forEach((b) => b.addEventListener('click', () => PF.openSheet(b.dataset.sheet)));
   function setPreview(on) {
@@ -259,9 +277,9 @@
 
   /* ---------- 상단 ---------- */
   const fileMenu = $('#file-menu');
-  document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.menu-wrap')) fileMenu.classList.add('hidden'); });
+  document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.menu-wrap') && !fileMenu.classList.contains('hidden')) { fileMenu.classList.add('hidden'); PF.backPop(); } });
   const actions = {
-    'menu-file': () => fileMenu.classList.toggle('hidden'),
+    'menu-file': () => { fileMenu.classList.toggle('hidden'); if (!fileMenu.classList.contains('hidden')) PF.backPush(); else PF.backPop(); },
     'close-sheets': () => PF.closeSheets(),
     'toggle-preview': () => setPreview(!PF.ui.preview),
     'close-text': () => PF.closeTextSheet && PF.closeTextSheet(),
@@ -279,7 +297,7 @@
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!b || !actions[b.dataset.act]) return;
-    if (b.closest('.menu')) fileMenu.classList.add('hidden');
+    if (b.closest('.menu')) { fileMenu.classList.add('hidden'); PF.backPop(); }
     actions[b.dataset.act]();
   });
   $$('.tab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
