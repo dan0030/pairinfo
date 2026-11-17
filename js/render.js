@@ -32,6 +32,9 @@
     const s = PF.project.settings, t = s.theme, f = PF.frameEl;
     const map = { bg: t.bg, card: t.card, border: t.border, title: t.title, text: t.text, muted: t.muted, a: t.accentA, b: t.accentB, tag: t.tagBg, tagtext: t.tagText, hl: t.highlight, line: t.line };
     for (const k in map) f.style.setProperty('--c-' + k, map[k]);
+    // 그라데이션 면 (단색 값은 섞은 색 계산에 계속 쓰이므로 따로 둠)
+    if (t.cardGrad) f.style.setProperty('--card-fill', PF.cssGrad(t.cardGrad)); else f.style.removeProperty('--card-fill');
+    if (t.tagGrad) f.style.setProperty('--tag-fill', PF.cssGrad(t.tagGrad)); else f.style.removeProperty('--tag-fill');
     f.style.setProperty('--radius', s.radius + 'px');
     f.style.setProperty('--bw', s.borderWidth + 'px');
     f.style.setProperty('--gap', s.gap + 'px');
@@ -50,7 +53,7 @@
     f.style.setProperty('--page-color', pg.color || t.border);
     f.style.setProperty('--page-radius', pg.radius + 'px');
     f.style.setProperty('--page-inset', pg.inset + 'px');
-    f.style.setProperty('--page-fill', pg.fill === 'card' ? t.card : pg.fill === 'bg' ? t.bg : 'transparent');
+    f.style.setProperty('--page-fill', pg.fill === 'card' ? (t.cardGrad ? PF.cssGrad(t.cardGrad) : t.card) : pg.fill === 'bg' ? t.bg : 'transparent');
   }
   PF.applyVars = applyVars;
 
@@ -144,7 +147,8 @@
     if (!def) return h('div', { class: 'pf-block' }, '알 수 없는 블록');
     const w = b.data.who === 'B' ? 'B' : 'A';
     const el = h('div', { class: `pf-block t-${b.type} st-${b.style} who-${w}` + (PF.ui.selected === b.id ? ' selected' : ''), 'data-id': b.id });
-    if (b.bg) el.style.setProperty('--blk-bg', b.bg);
+    if (b.bgGrad) el.style.setProperty('--blk-bg', PF.cssGrad(b.bgGrad));
+    else if (b.bg) el.style.setProperty('--blk-bg', b.bg);
     if (b.border) { el.style.setProperty('--blk-border', b.border); el.style.setProperty('--blk-bw', 'var(--bw)'); }
     if (b.color) el.style.setProperty('--blk-text', b.color);
     if (b.pad != null && b.pad !== '') el.style.setProperty('--blk-pad', b.pad + 'px');

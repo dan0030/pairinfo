@@ -345,3 +345,16 @@ body.is-dragging { cursor: grabbing; user-select: none; }
   .tb-right .btn.primary .mob { display: none !important; }
   .selbar button { width: 34px; }
 }
+
+/* 두상: 공통 / 이 블록만 따로 */
+.seg.sm-seg { display: flex; width: 100%; margin: 2px 0 6px; }
+.seg.sm-seg .seg-btn { flex: 1; padding: 7px 8px; font-size: 12.5px; }
+
+/* 그라데이션 편집기 */
+.grad-ed { margin: 4px 0 6px; }
+.grad-ed .check { margin: 6px 0; }
+.grad-prev { height: 26px; border-radius: 8px; border: 1px solid var(--ui-line); margin: 4px 0 6px; }
+.grad-ed > .f-row, .grad-ed > .check, .grad-ed > .btns { margin-left: 12px; }
+.grad-ed:has(.grad-prev) { padding: 4px 10px 6px 0; border-left: 3px solid var(--ui-pri-soft); padding-left: 2px; }
+.rt-btn.grad-btn { background: linear-gradient(90deg, #3b5bfd, #e9579b); }
+.rt-btn.grad-btn:hover { filter: brightness(1.1); background: linear-gradient(90deg, #3b5bfd, #e9579b); }

@@ -8,6 +8,12 @@
   const who = (w) => (w === 'B' ? 'B' : 'A');
 
   const WHO_CHOICES = [['A', '캐릭터 A'], ['B', '캐릭터 B']];
+
+  /* 두상: 기본은 모든 블록이 함께 쓰는 공통 두상, ownA/ownB 를 켜면 이 블록 전용 두상(headA/headB) */
+  const headGet = (d, w) => (d['own' + w] ? d['head' + w] : chars()[w].img);
+  const headSet = (d, w) => (r) => { if (d['own' + w]) d['head' + w] = r; else chars()[w].img = r; };
+  const headImg = (d, w, label) => ({ label, get: () => headGet(d, w), set: headSet(d, w), own: { obj: d, w } });
+  PF.headGet = headGet;
   const RATIOS = [['custom', '직접 정하기 (높이 조절)'], ['auto', '원본 비율'], ['1/1', '1:1'], ['4/3', '4:3'], ['3/4', '3:4'], ['6/5', '6:5'], ['16/9', '16:9'], ['9/16', '9:16'], ['3/1', '3:1 (와이드)']];
   const isCustom = (k) => (d) => d[k] === 'custom';
   /* 이미지 칸 크기 옵션: 비율(직접 정하기) → 높이, 너비(%), 정렬 */
@@ -99,16 +105,18 @@
       { key: 'showFields', label: '항목 표 (소속/상징 등)', type: 'check' },
       { key: 'tagStyle', label: '키워드 모양', type: 'select', choices: [['default', '기본 (테마 태그 색)'], ['tint', '연한 캐릭터 색'], ['solid', '캐릭터 색 면'], ['line', '캐릭터 색 테두리']] },
       { key: 'tagBg', label: '키워드 배경', type: 'color' },
+      { key: 'tagBgGrad', label: '키워드 배경', type: 'grad' },
       { key: 'tagText', label: '키워드 글자', type: 'color' },
     ],
     list: { key: 'fields', label: '항목 표', make: () => ({ k: '항목', v: '' }), title: (it) => it.k },
-    images: (b) => [{ label: '캐릭터 ' + who(b.data.who) + ' 두상', get: () => chars()[who(b.data.who)].img, set: (r) => (chars()[who(b.data.who)].img = r) }],
+    images: (b) => [headImg(b.data, who(b.data.who), '캐릭터 ' + who(b.data.who) + ' 두상')],
     render(b) {
       const d = b.data, w = who(d.who);
       const el = h('div', { class: 'pf-char who-' + w + ' tags-' + (d.tagStyle || 'default') });
-      if (d.tagBg) el.style.setProperty('--tag-bg', d.tagBg);
+      if (d.tagBgGrad) el.style.setProperty('--tag-bg', PF.cssGrad(d.tagBgGrad));
+      else if (d.tagBg) el.style.setProperty('--tag-bg', d.tagBg);
       if (d.tagText) el.style.setProperty('--tag-text', d.tagText);
-      if (d.showImg) el.append(PF.imgSlot(chars()[w].img, (r) => (chars()[w].img = r), Object.assign({ cls: 'pf-char-img', ph: '두상 이미지' }, sizeOf(d))));
+      if (d.showImg) el.append(PF.imgSlot(headGet(d, w), headSet(d, w), Object.assign({ cls: 'pf-char-img', ph: '두상 이미지' }, sizeOf(d))));
       el.append(ed(d, 'label', { cls: 'pf-label acc', ph: 'CHARACTER' }), charName(w, 'pf-name'));
       if (d.showTags) el.append(tagList(d.tags, { cls: 'pill' }));
       if (d.showProfile) el.append(ed(d, 'profile', { cls: 'pf-body pf-profile', ph: '간략 프로필 (나이, 소속, 성격 등)' }));
@@ -136,7 +144,7 @@
       { key: 'noImgFill', label: '빈 원 색', type: 'select', choices: [['tint', '연한 캐릭터 색'], ['solid', '캐릭터 색 (흰 글자)'], ['line', '테두리만']] },
       { key: 'dashed', label: '점선 화살표', type: 'check' },
     ],
-    images: () => ['A', 'B'].map((w) => ({ label: '캐릭터 ' + w + ' 두상', get: () => chars()[w].img, set: (r) => (chars()[w].img = r) })),
+    images: (b) => ['A', 'B'].map((w) => headImg(b.data, w, '캐릭터 ' + w + ' 두상')),
     render(b) {
       const d = b.data;
       const person = (w) =>
@@ -157,7 +165,7 @@
 
   /* 관계도 두상: 이미지가 없을 때 대신 보여줄 것 */
   function avatarSlot(d, w) {
-    const ref = chars()[w].img;
+    const ref = headGet(d, w);
     const has = ref && PF.assets[ref.id];
     const mode = d.noImg || 'initial';
     const o = { cls: 'pf-avatar shape-' + d.shape + ' fill-' + (d.noImgFill || 'tint'), ratio: '1/1', ph: '두상', style: { width: d.avatar + 'px' } };
@@ -166,14 +174,14 @@
       if (mode === 'initial') {
         const tmp = document.createElement('div');
         tmp.innerHTML = chars()[w].name || '';
-        const ch = Array.from(tmp.textContent.trim())[0] || '?';
+        const ch = Array.from(tmp.textContent.trim())[0] || '';
         o.empty = h('span', { class: 'pf-avatar-text', 'data-init': w, style: { fontSize: Math.round(d.avatar * 0.42) + 'px' } }, ch);
       } else if (mode === 'symbol') {
         o.empty = ed(d, 'sym' + w, { cls: 'pf-avatar-text', ph: '글자', tag: 'span' });
         o.empty.style.fontSize = Math.round(d.avatar * 0.36) + 'px';
       }
     }
-    return PF.imgSlot(ref, (r) => (chars()[w].img = r), o);
+    return PF.imgSlot(ref, headSet(d, w), o);
   }
 
   B.summary = {
@@ -335,6 +343,7 @@
       { key: 'showName', label: '이름 보이기', type: 'check' },
     ],
     list: { key: 'items', label: '대사', make: () => ({ who: 'A', text: '' }), title: (it) => it.text.replace(/<[^>]+>/g, '').slice(0, 14) || '(빈 대사)', who: true, whoBoth: false },
+    images: (b) => (b.data.showAvatar ? ['A', 'B'].map((w) => headImg(b.data, w, '캐릭터 ' + w + ' 두상')) : []),
     render(b) {
       const d = b.data;
       const box = h('div', { class: 'pf-quotes' });
@@ -342,7 +351,7 @@
         const w = who(it.who);
         box.append(
           h('div', { class: 'pf-quote who-' + w + (w === 'B' ? ' right' : '') },
-            d.showAvatar ? PF.imgSlot(chars()[w].img, (r) => (chars()[w].img = r), { cls: 'pf-avatar sm shape-circle', ratio: '1/1', ph: '', style: { width: (d.avatar ?? 52) + 'px' } }) : null,
+            d.showAvatar ? PF.imgSlot(headGet(d, w), headSet(d, w), { cls: 'pf-avatar sm shape-circle', ratio: '1/1', ph: '', style: { width: (d.avatar ?? 52) + 'px' } }) : null,
             h('div', { class: 'pf-quote-main' },
               d.showName ? charName(w, 'pf-small strong acc') : null,
               ed(it, 'text', { cls: 'pf-bubble', ph: '대사' }))));

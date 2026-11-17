@@ -33,7 +33,7 @@
     el._set(html);
     if (el._shared && el._key === 'name') {
       const c = PF.project.chars, w = el._obj === c.A ? 'A' : el._obj === c.B ? 'B' : null;
-      if (w) PF.$$(`.pf-avatar-text[data-init="${w}"]`, PF.frameEl).forEach((x) => (x.textContent = Array.from(el.textContent.trim())[0] || '?'));
+      if (w) PF.$$(`.pf-avatar-text[data-init="${w}"]`, PF.frameEl).forEach((x) => (x.textContent = Array.from(el.textContent.trim())[0] || ''));
     }
     if (el._shared) {
       PF.$$('.pf-ed', PF.frameEl).forEach((x) => {
@@ -98,7 +98,46 @@
     after();
   }
 
-  let fontSel, sizeSel, colorInp, hlInp, swA, swH;
+  let fontSel, sizeSel, colorInp, hlInp, swA, swH, gA, gB;
+  const isGradSpan = (x) => x.style && (x.style.backgroundClip === 'text' || x.style.webkitBackgroundClip === 'text');
+  function plainGrad(x) {
+    x.style.backgroundImage = '';
+    x.style.backgroundClip = '';
+    x.style.webkitBackgroundClip = '';
+    x.style.webkitTextFillColor = '';
+    if (x.style.color === 'transparent') x.style.color = '';
+    if (!x.getAttribute('style')) x.removeAttribute('style');
+  }
+  /* 선택한 글자를 그라데이션으로 */
+  function gradText(c1, c2) {
+    restore();
+    const sel = getSelection();
+    if (!current || !sel.rangeCount || sel.isCollapsed) return PF.toast('그라데이션을 넣을 글자를 먼저 선택하세요');
+    const r = sel.getRangeAt(0);
+    if (!current.contains(r.commonAncestorContainer)) return;
+    const span = document.createElement('span');
+    span.style.backgroundImage = `linear-gradient(90deg, ${c1}, ${c2})`;
+    span.style.webkitBackgroundClip = 'text';
+    span.style.backgroundClip = 'text';
+    span.style.webkitTextFillColor = 'transparent';
+    span.style.color = 'transparent';
+    span.append(r.extractContents());
+    span.querySelectorAll('span').forEach((x) => isGradSpan(x) && plainGrad(x));
+    r.insertNode(span);
+    // 빈 껍데기 정리
+    current.querySelectorAll('span').forEach((x) => { if (!x.textContent && !x.querySelector('br,img')) x.remove(); });
+    sel.removeAllRanges();
+    const nr = document.createRange();
+    nr.selectNodeContents(span);
+    sel.addRange(nr);
+    after();
+  }
+  function clearGrad() {
+    const sel = getSelection();
+    if (!current || !sel.rangeCount) return;
+    const r = sel.getRangeAt(0);
+    current.querySelectorAll('span').forEach((x) => { if (isGradSpan(x) && r.intersectsNode(x)) plainGrad(x); });
+  }
   PF.buildRichBar = function () {
     bar.innerHTML = '';
     fontSel = h('select', { class: 'rt-sel', title: '글꼴', onchange: () => { if (fontSel.value) exec('fontName', fontSel.value); fontSel.value = ''; } });
@@ -108,6 +147,8 @@
     hlInp = h('input', { type: 'color', class: 'rt-color', title: '형광펜 색 직접 고르기', onchange: () => exec('hiliteColor', hlInp.value) });
     swA = h('div', { class: 'rt-sw-group', title: '글자색' });
     swH = h('div', { class: 'rt-sw-group', title: '형광펜' });
+    gA = h('input', { type: 'color', class: 'rt-color', title: '그라데이션 시작 색', value: '#3B5BFD', oninput: () => (gA.dataset.touched = 1) });
+    gB = h('input', { type: 'color', class: 'rt-color', title: '그라데이션 끝 색', value: '#E9579B', oninput: () => (gA.dataset.touched = 1) });
     bar.append(
       fontSel, sizeSel, h('span', { class: 'rt-sep' }),
       btn('B', '굵게 (Ctrl+B)', () => exec('bold'), 'b'),
@@ -119,11 +160,13 @@
       h('span', { class: 'rt-sep' }),
       h('span', { class: 'rt-lbl' }, '형광'), swH, hlInp, btn('⊘', '형광펜 지우기', () => exec('hiliteColor', 'transparent')),
       h('span', { class: 'rt-sep' }),
+      h('span', { class: 'rt-lbl' }, '그라데이션'), gA, gB, btn('적용', '선택한 글자를 그라데이션으로', () => gradText(gA.value, gB.value), 'txt grad-btn'),
+      h('span', { class: 'rt-sep' }),
       btn('⇤', '왼쪽 정렬', () => exec('justifyLeft')),
       btn('↔', '가운데 정렬', () => exec('justifyCenter')),
       btn('⇥', '오른쪽 정렬', () => exec('justifyRight')),
       h('span', { class: 'rt-sep' }),
-      btn('지우기', '꾸밈 모두 지우기', () => { exec('removeFormat'); exec('hiliteColor', 'transparent'); }, 'txt')
+      btn('지우기', '꾸밈 모두 지우기', () => { restore(); clearGrad(); exec('removeFormat'); exec('hiliteColor', 'transparent'); }, 'txt')
     );
     PF.refreshRichBar();
   };
@@ -134,6 +177,8 @@
     fontSel.append(h('option', { value: '' }, '글꼴'), ...PF.fontList().map((f) => h('option', { value: f.family, style: `font-family:'${f.family}'` }, f.label)));
     const t = PF.project.settings.theme;
     const sw = (c, fn) => h('button', { class: 'rt-sw', type: 'button', style: { background: c }, title: c, onmousedown: (e) => e.preventDefault(), onclick: () => fn(c) });
+    // 그라데이션 기본 색: 두 캐릭터 색
+    if (gA && !gA.dataset.touched) { gA.value = (t.accentA || '#3B5BFD').slice(0, 7); gB.value = (t.accentB || '#E9579B').slice(0, 7); }
     swA.replaceChildren(...[t.title, t.text, t.muted, t.accentA, t.accentB].map((c) => sw(c, (v) => exec('foreColor', v))));
     swH.replaceChildren(...[t.highlight, t.tagBg, t.accentA + '33', t.accentB + '55'].map((c) => sw(c, (v) => exec('hiliteColor', v))));
   };

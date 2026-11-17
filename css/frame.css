@@ -39,7 +39,7 @@
 .pf-block {
   position: relative;
   min-width: 0;
-  background: var(--blk-bg, var(--blk-bg-default, var(--c-card)));
+  background: var(--blk-bg, var(--blk-bg-default, var(--card-fill, var(--c-card))));
   border: var(--blk-bw, var(--bw)) solid var(--blk-border, var(--c-border));
   border-radius: var(--radius);
   padding: var(--blk-pad, var(--pad));
@@ -48,7 +48,7 @@
 .pf-block.st-accent { border-color: var(--blk-border, var(--acc)); }
 .pf-block.st-a { border-color: var(--blk-border, var(--c-a)); }
 .pf-block.st-b { border-color: var(--blk-border, var(--c-b)); }
-.pf-block.st-fill { background: var(--blk-bg, var(--c-tag)); border-color: var(--blk-border, transparent); }
+.pf-block.st-fill { background: var(--blk-bg, var(--tag-fill, var(--c-tag))); border-color: var(--blk-border, transparent); }
 .pf-block.st-solidA, .pf-block.st-solidB { border-color: var(--blk-border, transparent); color: var(--blk-text, #fff); --c-title: currentColor; --c-muted: currentColor; --c-text: currentColor; }
 .pf-block.st-solidA { background: var(--blk-bg, var(--c-a)); }
 .pf-block.st-solidB { background: var(--blk-bg, var(--c-b)); }
@@ -89,7 +89,7 @@
 .pf-tags.align-center { justify-content: center; }
 .pf-tags.align-right { justify-content: flex-end; }
 .pf-title-block .pf-tags { margin-top: 16px; }
-.pf-tag { display: inline-block; background: var(--c-tag); color: var(--c-tagtext); font-weight: 700; font-size: 16px; padding: 5px 14px; border-radius: 999px; line-height: 1.5; }
+.pf-tag { display: inline-block; background: var(--tag-fill, var(--c-tag)); color: var(--c-tagtext); font-weight: 700; font-size: 16px; padding: 5px 14px; border-radius: 999px; line-height: 1.5; }
 .pf-tags.hash .pf-tag::before { content: '#'; }
 .pf-tags.hash .pf-tag.is-empty::before { content: '#' attr(data-ph); }
 .pf-hashtags .pf-tags { margin-top: 10px; }
@@ -166,9 +166,9 @@
 .pf-tl-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 2px; }
 
 .pf-timeline.style-cards { gap: 14px; }
-.pf-timeline.style-cards .pf-tl-item { display: grid; grid-template-columns: auto 1fr; gap: 0 18px; padding: 20px 22px; border: var(--bw) solid var(--c-border); border-radius: calc(var(--radius) * .7); background: var(--c-card); }
+.pf-timeline.style-cards .pf-tl-item { display: grid; grid-template-columns: auto 1fr; gap: 0 18px; padding: 20px 22px; border: var(--bw) solid var(--c-border); border-radius: calc(var(--radius) * .7); background: var(--card-fill, var(--c-card)); }
 .pf-timeline.style-cards .pf-tl-dot { display: none; }
-.pf-badge { font-size: 13px; font-weight: 800; letter-spacing: .06em; color: var(--acc); background: var(--c-tag); border-radius: 10px; padding: 7px 10px; height: fit-content; }
+.pf-badge { font-size: 13px; font-weight: 800; letter-spacing: .06em; color: var(--acc); background: var(--tag-fill, var(--c-tag)); border-radius: 10px; padding: 7px 10px; height: fit-content; }
 .pf-timeline.style-cards .pf-tl-body { padding: 0; }
 .pf-timeline.style-cards .pf-tl-head .pf-h3 { font-family: var(--f-title); font-weight: 800; font-size: 24px; }
 
@@ -205,8 +205,8 @@
 .pf-quote.right .pf-quote-main { align-items: flex-end; }
 .pf-bubble { position: relative; background: color-mix(in srgb, var(--acc) 14%, var(--c-card)); color: var(--c-title); padding: 13px 18px; border-radius: 20px; border-bottom-left-radius: 6px; font-size: 16px; line-height: 1.6; min-width: 3em; }
 .pf-quote.right .pf-bubble { border-bottom-left-radius: 20px; border-bottom-right-radius: 6px; }
-.pf-bubble::before { content: ''; position: absolute; bottom: 0; left: -7px; border-right: 12px solid color-mix(in srgb, var(--acc) 14%, var(--c-card)); border-top: 12px solid transparent; }
-.pf-quote.right .pf-bubble::before { left: auto; right: -7px; border-right: 0; border-left: 12px solid color-mix(in srgb, var(--acc) 14%, var(--c-card)); }
+.pf-bubble::after { content: ''; position: absolute; bottom: 0; left: -7px; border-right: 12px solid color-mix(in srgb, var(--acc) 14%, var(--c-card)); border-top: 12px solid transparent; }
+.pf-quote.right .pf-bubble::after { left: auto; right: -7px; border-right: 0; border-left: 12px solid color-mix(in srgb, var(--acc) 14%, var(--c-card)); }
 
 /* ---------- 선호 / 기피 ---------- */
 .pf-yesno { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
@@ -278,7 +278,7 @@ body.is-dragging .pf-blk-tools { display: none !important; }
 .pf-char.tags-solid { --tag-bg-d: var(--acc); --tag-text-d: #fff; }
 .pf-char.tags-line { --tag-bg-d: transparent; --tag-text-d: var(--acc); }
 .pf-char.tags-line .pf-tag { box-shadow: inset 0 0 0 1.5px var(--tag-text, var(--acc)); }
-.pf-char .pf-tag { background: var(--tag-bg, var(--tag-bg-d, var(--c-tag))); color: var(--tag-text, var(--tag-text-d, var(--c-tagtext))); }
+.pf-char .pf-tag { background: var(--tag-bg, var(--tag-bg-d, var(--tag-fill, var(--c-tag)))); color: var(--tag-text, var(--tag-text-d, var(--c-tagtext))); }
 
 /* ===== 편집 표시 크기 보정: 캔버스를 축소해도 손잡이·도구는 같은 크기로 ===== */
 .pf-frame { --inv: 1; }
@@ -306,3 +306,19 @@ body.is-dragging .pf-blk-tools { display: none !important; }
 /* 원형·정사각 두상은 언제나 가로 = 세로 (칸이 좁아도 타원이 되지 않게) */
 .pf-avatar { aspect-ratio: 1 / 1 !important; height: auto !important; min-height: 0; max-width: 100%; flex: none; }
 .pf-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ===== 글자가 비었을 때 모양 정리 =====
+   미리보기 · PNG: 내용이 하나도 없는 줄·묶음은 통째로 숨겨서 빈 선·빈 틈이 남지 않게 */
+.pf-frame:not(.editing) .pf-field:not(:has(.pf-ed:not(.is-empty))),
+.pf-frame:not(.editing) .pf-fields:not(:has(.pf-field .pf-ed:not(.is-empty))),
+.pf-frame:not(.editing) .pf-tags:not(:has(.pf-tag:not(.is-empty))),
+.pf-frame:not(.editing) .pf-head:not(:has(.pf-ed:not(.is-empty))),
+.pf-frame:not(.editing) .pf-heading:not(:has(.pf-ed:not(.is-empty))),
+.pf-frame:not(.editing) .pf-tl-item:not(:has(.pf-ed:not(.is-empty))),
+.pf-frame:not(.editing) .pf-quote:has(.pf-bubble.is-empty),
+.pf-frame:not(.editing) .pf-yn:not(:has(.pf-ed:not(.is-empty))),
+.pf-frame:not(.editing) .pf-arrow-text.is-empty { display: none !important; }
+/* 편집 중: 빈 칸도 안내글이 칸 안에 들어가게 */
+.pf-frame.editing .pf-bubble.is-empty { min-width: 6em; }
+.pf-frame.editing .pf-tag.is-empty { min-width: 4.5em; }
+.pf-frame.editing .pf-avatar-text.is-empty { min-width: 2.5em; }

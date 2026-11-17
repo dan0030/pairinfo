@@ -73,6 +73,31 @@
     if (allowReset) wrap.append(h('button', { class: 'mini', title: '기본값으로', onclick: () => { delete obj[key]; full(); } }, '↺'));
     return wrap;
   }
+  /* 그라데이션 편집기: 켜면 obj[key] = { c, three, kind, a } */
+  function gradEditor(obj, key, label, base) {
+    const box = h('div', { class: 'grad-ed' });
+    const on = h('input', { type: 'checkbox' });
+    on.checked = !!obj[key];
+    on.addEventListener('change', () => {
+      if (on.checked) obj[key] = { c: [base[0] || '#FFFFFF', base[1] || '#E6E8EE', base[2] || '#FFFFFF'], three: false, kind: 'linear', a: 135 };
+      else delete obj[key];
+      full();
+    });
+    box.append(h('label', { class: 'check' }, on, ' ' + (label || '그라데이션으로 칠하기')));
+    const g = obj[key];
+    if (!g) return box;
+    const prev = h('div', { class: 'grad-prev', style: { background: PF.cssGrad(g) } });
+    const upd = () => { prev.style.background = PF.cssGrad(g); live(); };
+    box.append(prev,
+      row('색 1', color(g.c, 0, upd)),
+      row('색 2', color(g.c, 1, upd)),
+      check(g, 'three', '색 하나 더'),
+      g.three ? row('색 3', color(g.c, 2, upd)) : null,
+      row('모양', select(g, 'kind', [['linear', '직선'], ['radial', '원형']])),
+      g.kind !== 'radial' ? row('각도', range(g, 'a', 0, 360, 1, upd, (v) => v + '°')) : null,
+      h('div', { class: 'btns' }, btn('색 순서 뒤집기', () => { const n = g.three ? 3 : 2; const r = g.c.slice(0, n).reverse(); g.c.splice(0, n, ...r); full(); })));
+    return box;
+  }
   function toHex6(v) {
     if (!v) return '';
     if (/^#[0-9a-f]{3}$/i.test(v)) return '#' + v.slice(1).split('').map((c) => c + c).join('');
@@ -92,10 +117,25 @@
       img.set({ id, x: 50, y: 50, zoom: 1 });
       full();
     };
-    const box = h('div', { class: 'img-ctl' },
+    const box = h('div', { class: 'img-ctl' });
+    if (img.own) {
+      // 두상: 공통 두상 ↔ 이 블록 전용 두상
+      const { obj, w } = img.own;
+      const seg = h('div', { class: 'seg sm-seg' },
+        ...[[false, '공통 두상'], [true, '이 블록만 따로']].map(([v, l]) =>
+          h('button', { class: 'seg-btn' + (!!obj['own' + w] === v ? ' on' : ''), onclick: () => {
+            if (!!obj['own' + w] === v) return;
+            obj['own' + w] = v;
+            // 처음 따로 쓸 땐 지금 공통 두상에서 출발 (갑자기 비지 않게)
+            if (v && !obj['head' + w] && PF.project.chars[w].img) obj['head' + w] = Object.assign({}, PF.project.chars[w].img);
+            full();
+          } }, l)));
+      box.append(seg, h('p', { class: 'hint' }, obj['own' + w] ? '이 블록에만 쓰이는 두상이에요. 다른 블록은 그대로예요.' : '공통 두상은 관계도 · 프로필 · 대사 등 “공통 두상”을 쓰는 모든 블록에 같이 바뀌어요.'));
+    }
+    box.append(
       h('div', { class: 'img-ctl-top' },
         h('div', { class: 'img-thumb' + (has ? '' : ' empty') }, has ? h('img', { src: PF.assets[ref.id], alt: '' }) : '없음'),
-        h('div', {}, h('div', { class: 'f-lbl' }, img.label), h('div', { class: 'btns' }, btn(has ? '교체' : '올리기', pick), has ? btn('삭제', () => { img.set(null); full(); }, 'danger') : null))));
+        h('div', {}, h('div', { class: 'f-lbl' }, img.label + (img.own && img.own.obj['own' + img.own.w] ? ' (이 블록 전용)' : '')), h('div', { class: 'btns' }, btn(has ? '교체' : '올리기', pick), has ? btn('삭제', () => { img.set(null); full(); }, 'danger') : null))));
     if (has) {
       ref.x ??= 50; ref.y ??= 50; ref.zoom ??= 1;
       box.append(row('가로 위치', range(ref, 'x', 0, 100, 1)), row('세로 위치', range(ref, 'y', 0, 100, 1)), row('확대', range(ref, 'zoom', 1, 4, 0.05, null, (v) => v.toFixed(2) + '×')));
@@ -236,6 +276,7 @@
     const opts = (def.options || []).filter((o) => !o.when || o.when(D)).map((o) =>
       o.type === 'check' ? check(D, o.key, o.label)
         : o.type === 'color' ? row(o.label, color(D, o.key, null, true))
+        : o.type === 'grad' ? gradEditor(D, o.key, o.label + ' 그라데이션', [D.tagBg || PF.project.settings.theme.tagBg, PF.project.settings.theme.accentA + '33'])
         : o.type === 'select' ? row(o.label, select(D, o.key, o.choices, pickCustom(o)))
           : row(o.label, range(D, o.key, o.min, o.max, o.step, null, o.unit ? (v) => v + o.unit : null)));
     if (opts.length) box.append(section('블록 옵션', ...opts));
@@ -250,6 +291,7 @@
     box.append(section('카드 모양',
       row('스타일', select(b, 'style', Object.entries(PF.STYLE_LABEL))),
       row('면 색', color(b, 'bg', null, true)),
+      gradEditor(b, 'bgGrad', '면을 그라데이션으로', [b.bg || PF.project.settings.theme.card, PF.project.settings.theme.tagBg]),
       row('테두리 색', color(b, 'border', null, true)),
       row('글자 색', color(b, 'color', null, true)),
       row('안쪽 여백', (() => { const hd = { pad: b.pad ?? PF.project.settings.cardPad }; return range(hd, 'pad', 0, 80, 1, () => { b.pad = hd.pad; live(); }); })())));
@@ -268,8 +310,8 @@
     const em = h('div', { class: 'insp-empty' });
     em.innerHTML = PF.icon('sliders') + (PF.isMobile() ? '블록을 누르면 여기서 옵션·색·배치를 바꿀 수 있어요.' : '블록이나 스티커를 선택하면<br>여기서 옵션·색·배치를 바꿀 수 있어요.');
     box.append(em);
-    box.append(section('캐릭터 두상',
-      h('p', { class: 'hint' }, '두상은 관계도 · 프로필 · 대사 블록에서 함께 쓰여요. 이름은 캔버스에서 직접 고치면 모든 곳에 반영됩니다.'),
+    box.append(section('공통 두상',
+      h('p', { class: 'hint' }, '관계도 · 프로필 · 대사 블록이 함께 쓰는 두상이에요. 블록마다 다른 두상을 쓰려면 그 블록을 선택하고 “이 블록만 따로”를 고르세요.'),
       ...['A', 'B'].map((w) => imageControls({ label: '캐릭터 ' + w + ' — ' + (c[w].name || '').replace(/<[^>]+>/g, ''), get: () => c[w].img, set: (r) => (c[w].img = r) }))));
     box.append(section('사용법', h('ul', { class: 'howto' },
       ...(PF.isMobile() ? [
@@ -314,6 +356,10 @@
         h('span', { class: 'preset-sw' }, ...['bg', 'card', 'accentA', 'accentB', 'highlight'].map((k) => h('i', { style: { background: pr[k] } }))), name)))));
 
     box.append(section('색 직접 고르기', ...PF.THEME_KEYS.map(([k, label]) => row(label, color(t, k, themeChange)))));
+    box.append(section('그라데이션 면',
+      h('p', { class: 'hint' }, '모든 카드 면이나 태그 면을 그라데이션으로 칠해요. 블록 하나만 바꾸려면 그 블록의 “카드 모양”에서 고르세요.'),
+      gradEditor(t, 'cardGrad', '카드 면을 그라데이션으로', [t.card, t.tagBg]),
+      gradEditor(t, 'tagGrad', '태그·채움 면을 그라데이션으로', [t.tagBg, t.highlight])));
 
     box.append(section('크기 · 모양',
       row('가로 폭', (() => {

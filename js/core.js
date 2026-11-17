@@ -64,6 +64,14 @@
     theme: Object.assign({}, PF.PRESETS['기본 (네이비·머스터드)']),
   });
 
+  /* ---------- 그라데이션 색 ----------
+     { c: [색1, 색2, 색3?], three: bool, kind: 'linear'|'radial', a: 각도 } */
+  PF.cssGrad = function (g) {
+    if (!g || !Array.isArray(g.c)) return '';
+    const stops = (g.three ? g.c.slice(0, 3) : g.c.slice(0, 2)).filter(Boolean).join(', ');
+    return g.kind === 'radial' ? `radial-gradient(circle at center, ${stops})` : `linear-gradient(${g.a ?? 135}deg, ${stops})`;
+  };
+
   /* ---------- 상태 ---------- */
   PF.project = null; // 되돌리기 대상
   PF.assets = {}; // id -> dataURL (되돌리기 대상 아님)
