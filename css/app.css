@@ -379,3 +379,9 @@ body.is-dragging { cursor: grabbing; user-select: none; }
 .grad-stop-head .f-color { flex: 1; min-width: 0; }
 .grad-stop .f-row { grid-template-columns: 64px minmax(0, 1fr); margin: 6px 0; }
 .grad-ed > .f-row, .grad-ed > .check, .grad-ed > .btns { margin-left: 0; }
+
+/* 글자 스티커 프리셋 */
+.text-presets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+.tp-item { display: grid; place-items: center; min-height: 52px; border: 1px solid var(--ui-line); border-radius: 12px; background: #fff; cursor: pointer; padding: 6px; overflow: hidden; }
+.tp-item:hover { border-color: var(--ui-pri); background: #fafbff; }
+.tp-sample { white-space: nowrap !important; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }

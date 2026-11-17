@@ -271,8 +271,9 @@
     props.innerHTML = PF.icon('sliders') + '<span>속성</span>';
     if (st) {
       const arr = PF.project.stickers;
-      bar.replaceChildren(h('span', { class: 'sel-name' }, '스티커'),
-        ibtn('copy', '복제', () => { const c = Object.assign({}, st, { id: 's' + PF.uid(), x: st.x + 30, y: st.y + 30 }); arr.push(c); PF.ui.selSticker = c.id; full(); }),
+      bar.replaceChildren(h('span', { class: 'sel-name' }, st.type === 'text' ? '글자 스티커' : '스티커'),
+        st.type === 'text' ? ibtn('edit', '글자 고치기', () => PF.editTextSticker(st.id)) : null,
+        ibtn('copy', '복제', () => { const c = Object.assign(JSON.parse(JSON.stringify(st)), { id: 's' + PF.uid(), x: st.x + 30, y: st.y + 30 }); arr.push(c); PF.ui.selSticker = c.id; full(); }),
         ibtn('trash', '삭제', () => { arr.splice(arr.indexOf(st), 1); PF.ui.selSticker = null; full(); }, 'danger'),
         props);
     } else {
@@ -383,21 +384,52 @@
       h('li', {}, '작업은 이 브라우저에 자동 저장돼요. 다른 기기로 옮기려면 “저장 파일”을 쓰세요.'))));
   }
 
+  function textStickerSections(box, s) {
+    const redo = () => full();
+    box.append(section('글자',
+      h('div', { class: 'btns' }, btn('✎ 글자 고치기', () => PF.editTextSticker(s.id), 'primary')),
+      h('p', { class: 'hint' }, PF.isMobile() ? '“글자 고치기”를 누르면 편집 창이 열려요.' : '스티커를 두 번 눌러도 고칠 수 있어요. 글자 일부를 선택하면 꾸밈 막대로 색 · 그라데이션을 넣을 수 있어요.'),
+      row('글꼴', select(s, 'font', PF.fontList().map((f) => [f.family, f.label]))),
+      row('크기', range(s, 'size', 6, 400, 1, null, (v) => v + 'px')),
+      row('굵기', select(s, 'weight', [[300, '가늘게'], [400, '보통'], [600, '조금 굵게'], [700, '굵게'], [800, '아주 굵게'], [900, '가장 굵게']])),
+      row('색', color(s, 'color')),
+      row('정렬', select(s, 'align', [['center', '가운데'], ['left', '왼쪽'], ['right', '오른쪽']])),
+      row('줄 간격', range(s, 'lh', 0.8, 3, 0.05, null, (v) => Number(v).toFixed(2))),
+      row('자간', range(s, 'ls', -0.1, 0.5, 0.01, null, (v) => Number(v).toFixed(2) + 'em'))));
+    box.append(section('외곽선 · 그림자',
+      row('외곽선 두께', range(s, 'stroke', 0, 30, 0.5, null, (v) => v + 'px')),
+      s.stroke ? row('외곽선 색', color(s, 'strokeColor')) : null,
+      check(s, 'shadow', '그림자'),
+      s.shadow ? row('그림자 색', color(s, 'shadowColor')) : null));
+    const bgSec = section('배경 (라벨처럼)',
+      row('배경', select(s, 'bgType', [['none', '없음'], ['solid', '단색'], ['grad', '그라데이션']], redo)));
+    if (s.bgType === 'solid') bgSec.append(row('배경 색', color(s, 'bgColor')));
+    if (s.bgType === 'grad') {
+      if (!s.bgGrad) s.bgGrad = { stops: [{ c: PF.project.settings.theme.accentA, p: 0, o: 1 }, { c: PF.project.settings.theme.accentB, p: 100, o: 1 }], kind: 'linear', a: 90, x: 50, y: 50, shape: 'circle' };
+      bgSec.append(gradEditor(s, 'bgGrad', '그라데이션 사용', []));
+    }
+    if (s.bgType && s.bgType !== 'none') bgSec.append(row('안쪽 여백', range(s, 'pad', 0, 80, 1, null, (v) => v + 'px')), row('둥글기', range(s, 'radius', 0, 999, 1, null, (v) => v + 'px')));
+    box.append(bgSec);
+  }
+
   function stickerInspector(box, s) {
     const arr = PF.project.stickers;
     const i = arr.indexOf(s);
-    box.append(h('div', { class: 'insp-head' }, h('span', { class: 'insp-ico' }, '★'), h('div', {}, h('b', {}, '스티커'), h('div', { class: 'muted sm' }, '드래그로 이동 · 모서리로 크기 · 위 손잡이로 회전'))));
+    const isText = s.type === 'text';
+    box.append(h('div', { class: 'insp-head' }, h('span', { class: 'insp-ico' }, isText ? 'T' : '★'), h('div', {}, h('b', {}, isText ? '글자 스티커' : '스티커'), h('div', { class: 'muted sm' }, '드래그로 이동 · 모서리로 크기 · 위 손잡이로 회전'))));
+    if (isText) textStickerSections(box, s);
     box.append(section('조절',
-      row('크기', range(s, 'w', 16, Math.max(1200, s.w), 1, null, (v) => v + 'px')),
+      isText ? null : row('크기', range(s, 'w', 16, Math.max(1200, s.w), 1, null, (v) => v + 'px')),
       row('회전', range(s, 'rot', -180, 180, 1, null, (v) => v + '°')),
       row('투명도', range(s, 'opacity', 0.1, 1, 0.05, null, (v) => Math.round(v * 100) + '%')),
       row('가로 위치', range(s, 'x', -200, PF.project.settings.width + 200, 1)),
-      check(s, 'flip', '좌우 뒤집기'),
+      row('세로 위치', range(s, 'y', -200, Math.max(PF.frameEl.offsetHeight, 400) + 200, 1)),
+      isText ? null : check(s, 'flip', '좌우 뒤집기'),
       check(s, 'behind', '블록 뒤로 보내기')));
     box.append(section('순서 · 정리', h('div', { class: 'btns' },
       btn('맨 앞으로', () => { arr.splice(i, 1); arr.push(s); full(); }),
       btn('맨 뒤로', () => { arr.splice(i, 1); arr.unshift(s); full(); }),
-      btn('복제', () => { const c = Object.assign({}, s, { id: 's' + PF.uid(), x: s.x + 30, y: s.y + 30 }); arr.push(c); PF.ui.selSticker = c.id; full(); }),
+      btn('복제', () => { const c = Object.assign(JSON.parse(JSON.stringify(s)), { id: 's' + PF.uid(), x: s.x + 30, y: s.y + 30 }); arr.push(c); PF.ui.selSticker = c.id; full(); }),
       btn('삭제', () => { arr.splice(i, 1); PF.ui.selSticker = null; full(); }, 'danger'))));
   }
 

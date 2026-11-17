@@ -280,7 +280,7 @@
     frame0.addEventListener('click', (e) => {
       if (!PF.isMobile() || PF.ui.preview) return;
       const el = e.target.closest && e.target.closest('.pf-ed');
-      if (el && frame0.contains(el)) PF.openTextSheet(el);
+      if (el && frame0.contains(el) && !el.closest('.pf-sticker')) PF.openTextSheet(el);
     });
     for (const frame of [frame0, sheet]) initOn(frame, frame0);
     document.addEventListener('selectionchange', () => {

@@ -6,13 +6,22 @@
     const layer = h('div', { class: 'pf-stickers ' + (behind ? 'behind' : 'front') + (PF.ui.stickerLock ? ' locked' : '') });
     (PF.project.stickers || []).forEach((s) => {
       if (!!s.behind !== behind) return;
-      const src = PF.assets[s.src];
-      if (!src) return;
-      const el = h('div', { class: 'pf-sticker' + (PF.ui.selSticker === s.id ? ' selected' : ''), 'data-id': s.id });
-      Object.assign(el.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', opacity: s.opacity ?? 1, transform: `translate(-50%,-50%) rotate(${s.rot || 0}deg)` });
-      const img = h('img', { src, draggable: 'false', alt: '' });
-      if (s.flip) img.style.transform = 'scaleX(-1)';
-      el.append(img);
+      const isText = s.type === 'text';
+      const src = !isText && PF.assets[s.src];
+      if (!isText && !src) return;
+      const el = h('div', { class: 'pf-sticker' + (isText ? ' text' : '') + (PF.ui.selSticker === s.id ? ' selected' : ''), 'data-id': s.id });
+      Object.assign(el.style, { left: s.x + 'px', top: s.y + 'px', opacity: s.opacity ?? 1, transform: `translate(-50%,-50%) rotate(${s.rot || 0}deg)` });
+      if (isText) {
+        const t = PF.ed(s, 'html', { cls: 'pf-tsticker', ph: '글자를 입력하세요' });
+        t.contentEditable = 'false'; // 두 번 누르거나 “글자 고치기”로 편집
+        Object.assign(t.style, PF.textStickerStyle(s));
+        el.append(t);
+      } else {
+        el.style.width = s.w + 'px';
+        const img = h('img', { src, draggable: 'false', alt: '' });
+        if (s.flip) img.style.transform = 'scaleX(-1)';
+        el.append(img);
+      }
       if (!PF.ui.preview)
         el.append(
           h('div', { class: 'pf-chrome st-ui' },
@@ -44,6 +53,72 @@
     img.src = PF.assets[assetId];
   };
 
+  /* ---------- 글자 스티커 ---------- */
+  const fam = (f) => (/^(serif|sans-serif|monospace|cursive)$/.test(f) ? f : `'${f}'`);
+  PF.textStickerStyle = function (s) {
+    const st = {
+      fontFamily: `${fam(s.font || 'Paperlogy')}, 'Pretendard', sans-serif`,
+      fontSize: (s.size || 40) + 'px',
+      fontWeight: String(s.weight || 700),
+      color: s.color || '#16181D',
+      lineHeight: String(s.lh ?? 1.25),
+      letterSpacing: (s.ls ?? 0) + 'em',
+      textAlign: s.align || 'center',
+      whiteSpace: 'pre',
+      background: 'transparent',
+      padding: '0px',
+      borderRadius: '0px',
+      textShadow: s.shadow ? `0 ${Math.round((s.size || 40) * 0.06)}px ${Math.round((s.size || 40) * 0.18)}px ${PF.rgba(s.shadowColor || '#000000', 0.35)}` : 'none',
+      webkitTextStroke: s.stroke ? `${s.stroke}px ${s.strokeColor || '#FFFFFF'}` : '0px transparent',
+      paintOrder: 'stroke fill',
+    };
+    if (s.bgType === 'solid' || s.bgType === 'grad') {
+      st.background = s.bgType === 'grad' && s.bgGrad ? PF.cssGrad(s.bgGrad) : s.bgColor || '#FFFFFF';
+      st.padding = `${Math.round((s.pad ?? 12) * 0.6)}px ${s.pad ?? 12}px`;
+      st.borderRadius = (s.radius ?? 12) + 'px';
+    }
+    return st;
+  };
+  PF.TEXT_PRESETS = (t, f) => [
+    { name: '기본 글자', html: '글자 스티커', size: 48, weight: 800, color: t.title, font: f.title },
+    { name: '라벨', html: 'LABEL', size: 26, weight: 700, color: '#FFFFFF', font: f.body, bgType: 'solid', bgColor: t.accentA, pad: 16, radius: 999, ls: 0.08 },
+    { name: '외곽선', html: '반짝!', size: 64, weight: 900, color: t.accentB, font: f.title, stroke: 8, strokeColor: '#FFFFFF' },
+    { name: '메모', html: '메모를 적어요', size: 24, weight: 600, color: t.text, font: f.body, bgType: 'solid', bgColor: t.tagBg, pad: 16, radius: 14 },
+    { name: '그림자', html: 'TITLE', size: 64, weight: 900, color: t.accentA, font: f.title, shadow: true, ls: 0.04 },
+    { name: '형광펜', html: '형광펜 강조', size: 30, weight: 800, color: t.title, font: f.body, bgType: 'solid', bgColor: t.highlight, pad: 10, radius: 4 },
+  ];
+  PF.addTextSticker = function (preset) {
+    const p = PF.project;
+    const stage = $('#stage');
+    const fr = PF.frameEl.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    const cx = ((sr.left + sr.width / 2 - fr.left) / PF.zoomScale) | 0;
+    const cy = ((sr.top + sr.height / 2 - fr.top) / PF.zoomScale) | 0;
+    const s = Object.assign({ id: 's' + PF.uid(), type: 'text', x: PF.clamp(cx, 60, p.settings.width - 60), y: PF.clamp(cy, 60, PF.frameEl.offsetHeight - 60), rot: 0, opacity: 1, behind: false,
+      html: '글자', size: 40, weight: 700, color: '#16181D', font: 'Paperlogy', align: 'center', lh: 1.25, ls: 0, stroke: 0, strokeColor: '#FFFFFF', shadow: false, shadowColor: '#000000',
+      bgType: 'none', bgColor: '#FFFFFF', pad: 12, radius: 12 }, JSON.parse(JSON.stringify(preset)));
+    delete s.name;
+    p.stickers.push(s);
+    PF.ui.selSticker = s.id;
+    PF.ui.selected = null;
+    PF.commit();
+    PF.render();
+  };
+  /* 글자 스티커 글 고치기: PC는 그 자리에서, 휴대폰은 글 편집 창 */
+  PF.editTextSticker = function (id) {
+    const t = PF.frameEl.querySelector(`.pf-sticker[data-id="${id}"] .pf-tsticker`);
+    if (!t) return;
+    if (PF.isMobile()) return PF.openTextSheet(t);
+    t.contentEditable = 'true';
+    t.spellcheck = false;
+    t.focus();
+    const r = document.createRange();
+    r.selectNodeContents(t);
+    const sel = getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    t.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== t && !PF.$('#rt-bar').contains(document.activeElement)) t.contentEditable = 'false'; }, 0); });
+  };
+
   PF.selectSticker = function (id) {
     PF.ui.selSticker = id;
     PF.ui.selected = null;
@@ -66,6 +141,7 @@
       if (PF.ui.preview) return;
       const el = e.target.closest('.pf-sticker');
       if (!el) return;
+      if (e.target.closest('.pf-ed[contenteditable="true"]')) return; // 글자 고치는 중: 커서 놓기 · 드래그 선택 허용
       e.preventDefault();
       e.stopPropagation();
       const s = getS(el.dataset.id);
@@ -80,7 +156,7 @@
       if (PF.ui.selSticker !== s.id) PF.selectSticker(s.id);
       const p = pt(e);
       const kind = e.target.classList.contains('st-rot') ? 'rot' : e.target.classList.contains('st-scale') ? 'scale' : 'move';
-      op = { s, el, kind, p0: p, x0: s.x, y0: s.y, w0: s.w, rot0: s.rot || 0, d0: Math.hypot(p.x - s.x, p.y - s.y) || 1, a0: Math.atan2(p.y - s.y, p.x - s.x) };
+      op = { s, el, kind, p0: p, x0: s.x, y0: s.y, w0: s.w, size0: s.size, rot0: s.rot || 0, d0: Math.hypot(p.x - s.x, p.y - s.y) || 1, a0: Math.atan2(p.y - s.y, p.x - s.x) };
       el.setPointerCapture(e.pointerId);
     }, true);
 
@@ -91,14 +167,19 @@
         s.x = Math.round(op.x0 + p.x - op.p0.x);
         s.y = Math.round(op.y0 + p.y - op.p0.y);
       } else if (op.kind === 'scale') {
-        s.w = Math.round(PF.clamp((op.w0 * Math.hypot(p.x - s.x, p.y - s.y)) / op.d0, 16, 3000));
+        const k = Math.hypot(p.x - s.x, p.y - s.y) / op.d0;
+        if (s.type === 'text') {
+          s.size = Math.round(PF.clamp(op.size0 * k, 6, 800));
+          Object.assign(op.el.querySelector('.pf-tsticker').style, PF.textStickerStyle(s));
+        } else s.w = Math.round(PF.clamp(op.w0 * k, 16, 3000));
       } else {
         let r = op.rot0 + ((Math.atan2(p.y - s.y, p.x - s.x) - op.a0) * 180) / Math.PI;
         r = ((r % 360) + 540) % 360 - 180;
         if (e.shiftKey) r = Math.round(r / 15) * 15;
         s.rot = Math.round(r);
       }
-      Object.assign(op.el.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', transform: `translate(-50%,-50%) rotate(${s.rot}deg)` });
+      Object.assign(op.el.style, { left: s.x + 'px', top: s.y + 'px', transform: `translate(-50%,-50%) rotate(${s.rot}deg)` });
+      if (s.type !== 'text') op.el.style.width = s.w + 'px';
     });
     const end = () => {
       if (!op) return;
@@ -108,6 +189,11 @@
     };
     frame.addEventListener('pointerup', end);
     frame.addEventListener('pointercancel', end);
+    // 글자 스티커를 두 번 누르면 글 고치기
+    frame.addEventListener('dblclick', (e) => {
+      const el = !PF.ui.preview && e.target.closest('.pf-sticker.text');
+      if (el) PF.editTextSticker(el.dataset.id);
+    });
 
     // 키보드: 선택한 스티커 미세 이동 / 삭제
     document.addEventListener('keydown', (e) => {
@@ -144,6 +230,17 @@
   };
 
   PF.renderStickerLib = function () {
+    const tp = $('#text-presets');
+    if (tp) {
+      const t = PF.project.settings.theme, f = PF.project.settings.fonts;
+      tp.replaceChildren(...PF.TEXT_PRESETS(t, f).map((pr) => {
+        const prev = h('span', { class: 'tp-sample' }, pr.name);
+        Object.assign(prev.style, PF.textStickerStyle(Object.assign({}, pr, { size: 15 })));
+        if (pr.stroke) prev.style.webkitTextStroke = '1.5px ' + pr.strokeColor;
+        if (pr.bgType) prev.style.padding = '3px 9px';
+        return h('button', { class: 'tp-item', title: pr.name + ' 붙이기', onclick: () => { PF.addTextSticker(pr); PF.closeSheets && PF.closeSheets(); } }, prev);
+      }));
+    }
     const box = $('#sticker-lib');
     box.replaceChildren();
     const lib = PF.project.stickerLib || [];

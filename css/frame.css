@@ -322,3 +322,10 @@ body.is-dragging .pf-blk-tools { display: none !important; }
 .pf-frame.editing .pf-bubble.is-empty { min-width: 6em; }
 .pf-frame.editing .pf-tag.is-empty { min-width: 4.5em; }
 .pf-frame.editing .pf-avatar-text.is-empty { min-width: 2.5em; }
+
+/* 글자 스티커 */
+.pf-sticker.text { width: max-content; }
+.pf-tsticker { display: block; width: max-content; min-width: 1ch; -webkit-font-smoothing: antialiased; }
+.pf-tsticker[contenteditable="true"] { cursor: text; outline: 2px dashed #3b5bfd; outline-offset: 4px; user-select: text; -webkit-user-select: text; }
+.pf-frame.editing .pf-sticker.text .pf-ed:hover { box-shadow: none; }
+.pf-frame.editing .pf-tsticker.is-empty::before { opacity: .55; }
