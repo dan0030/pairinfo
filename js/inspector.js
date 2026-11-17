@@ -73,29 +73,86 @@
     if (allowReset) wrap.append(h('button', { class: 'mini', title: '기본값으로', onclick: () => { delete obj[key]; full(); } }, '↺'));
     return wrap;
   }
-  /* 그라데이션 편집기: 켜면 obj[key] = { c, three, kind, a } */
+  /* 그라데이션 편집기 ─ 색 여러 개(2~8) · 위치 · 투명도 · 직선/원형/원뿔 · 중심 · 프리셋 */
+  const GRAD_PRESETS = (t) => [
+    ['테마 A→B', [t.accentA, t.accentB]],
+    ['태그→형광', [t.tagBg, t.highlight]],
+    ['카드→태그', [t.card, t.tagBg]],
+    ['노을', ['#FFB199', '#FF6B8B', '#8E5CF7']],
+    ['바다', ['#A8EDEA', '#5AA9E6', '#3A47D5']],
+    ['봄', ['#FDFCFB', '#F9D5E5', '#C7E9C0']],
+    ['밤하늘', ['#141E30', '#243B55', '#8FA7FF']],
+    ['무지개', ['#FF7A7A', '#FFC56E', '#FFF07A', '#8CE99A', '#74C0FC', '#B197FC']],
+    ['반투명', [t.accentA, t.accentA], [1, 0]],
+  ];
   function gradEditor(obj, key, label, base) {
     const box = h('div', { class: 'grad-ed' });
+    // 디자인 탭에 있으면 그 패널도 다시 그림 (속성 패널은 full() 이 다시 그림)
+    const again = () => { const inDesign = box.closest('#design-body'); full(); if (inDesign) PF.renderDesign(); };
     const on = h('input', { type: 'checkbox' });
     on.checked = !!obj[key];
     on.addEventListener('change', () => {
-      if (on.checked) obj[key] = { c: [base[0] || '#FFFFFF', base[1] || '#E6E8EE', base[2] || '#FFFFFF'], three: false, kind: 'linear', a: 135 };
+      if (on.checked) obj[key] = { stops: [{ c: base[0] || '#FFFFFF', p: 0, o: 1 }, { c: base[1] || '#E6E8EE', p: 100, o: 1 }], kind: 'linear', a: 135, x: 50, y: 50, shape: 'circle' };
       else delete obj[key];
-      full();
+      again();
     });
     box.append(h('label', { class: 'check' }, on, ' ' + (label || '그라데이션으로 칠하기')));
     const g = obj[key];
     if (!g) return box;
-    const prev = h('div', { class: 'grad-prev', style: { background: PF.cssGrad(g) } });
-    const upd = () => { prev.style.background = PF.cssGrad(g); live(); };
-    box.append(prev,
-      row('색 1', color(g.c, 0, upd)),
-      row('색 2', color(g.c, 1, upd)),
-      check(g, 'three', '색 하나 더'),
-      g.three ? row('색 3', color(g.c, 2, upd)) : null,
-      row('모양', select(g, 'kind', [['linear', '직선'], ['radial', '원형']])),
-      g.kind !== 'radial' ? row('각도', range(g, 'a', 0, 360, 1, upd, (v) => v + '°')) : null,
-      h('div', { class: 'btns' }, btn('색 순서 뒤집기', () => { const n = g.three ? 3 : 2; const r = g.c.slice(0, n).reverse(); g.c.splice(0, n, ...r); full(); })));
+    // 예전 형식이면 새 형식으로
+    if (!Array.isArray(g.stops)) { g.stops = PF.gradStops(g); delete g.c; delete g.three; }
+    g.kind ||= 'linear'; g.a ??= 135; g.x ??= 50; g.y ??= 50; g.shape ||= 'circle';
+    const t = PF.project.settings.theme;
+    const prev = h('div', { class: 'grad-prev big' });
+    const paintPrev = () => {
+      prev.style.background = PF.cssGrad(g);
+      // 위치 표시
+      prev.replaceChildren(...g.stops.map((s) => h('i', { class: 'grad-mark', style: { left: PF.clamp(s.p ?? 0, 0, 100) + '%', background: PF.rgba(s.c, 1) } })));
+    };
+    paintPrev();
+    const upd = () => { paintPrev(); live(); };
+
+    // 프리셋
+    const presets = h('div', { class: 'grad-presets' }, ...GRAD_PRESETS(t).map(([name, cs, os]) => {
+      const st = cs.map((c, i) => ({ c, p: Math.round((i / (cs.length - 1)) * 100), o: os ? os[i] : 1 }));
+      return h('button', { class: 'grad-preset', title: name, style: { background: PF.cssGrad({ stops: st, kind: 'linear', a: 90 }) }, onclick: () => { g.stops = st.map((x) => Object.assign({}, x)); again(); } });
+    }));
+
+    // 모양
+    const shape = [row('모양', select(g, 'kind', [['linear', '직선'], ['radial', '원형 (가운데서 퍼짐)'], ['conic', '원뿔 (빙 돌아감)']], again))];
+    if (g.kind !== 'radial') shape.push(row(g.kind === 'conic' ? '시작 각도' : '각도', range(g, 'a', 0, 360, 1, upd, (v) => v + '°')));
+    if (g.kind === 'radial') shape.push(row('퍼지는 모양', select(g, 'shape', [['circle', '동그랗게'], ['ellipse', '칸 모양대로(타원)']], again)));
+    if (g.kind !== 'linear') shape.push(row('중심 가로', range(g, 'x', 0, 100, 1, upd, (v) => v + '%')), row('중심 세로', range(g, 'y', 0, 100, 1, upd, (v) => v + '%')));
+
+    // 색 목록
+    const list = h('div', { class: 'grad-stops' });
+    g.stops.forEach((s, i) => {
+      s.o ??= 1; s.p ??= 0;
+      list.append(h('div', { class: 'grad-stop' },
+        h('div', { class: 'grad-stop-head' },
+          h('b', {}, '색 ' + (i + 1)),
+          color(s, 'c', upd),
+          g.stops.length > 2 ? h('button', { class: 'mini danger', title: '이 색 빼기', onclick: () => { g.stops.splice(i, 1); again(); } }, '✕') : null),
+        row('위치', range(s, 'p', 0, 100, 1, upd, (v) => v + '%')),
+        row('불투명도', range(s, 'o', 0, 1, 0.01, upd, (v) => Math.round(v * 100) + '%'))));
+    });
+    const sorted = () => g.stops.slice().sort((a, b) => a.p - b.p);
+    const tools = h('div', { class: 'btns' },
+      g.stops.length < 8 ? btn('+ 색 추가', () => {
+        // 가장 넓게 빈 곳 가운데에 앞뒤 색을 섞은 색을 넣음
+        const st = sorted();
+        let gi = 0, gw = -1;
+        for (let k = 0; k < st.length - 1; k++) if (st[k + 1].p - st[k].p > gw) { gw = st[k + 1].p - st[k].p; gi = k; }
+        const a = st[gi], b2 = st[gi + 1] || st[gi];
+        const mix = (x, y) => '#' + [0, 2, 4].map((o) => Math.round((parseInt(toHex6(x).slice(1 + o, 3 + o), 16) + parseInt(toHex6(y).slice(1 + o, 3 + o), 16)) / 2).toString(16).padStart(2, '0')).join('').toUpperCase();
+        g.stops.push({ c: mix(a.c, b2.c), p: Math.round((a.p + b2.p) / 2), o: (a.o + b2.o) / 2 });
+        g.stops.sort((x, y) => x.p - y.p);
+        again();
+      }) : null,
+      btn('고르게 배치', () => { g.stops.sort((a, b) => a.p - b.p).forEach((s, k) => (s.p = Math.round((k / (g.stops.length - 1)) * 100))); again(); }),
+      btn('순서 뒤집기', () => { g.stops.forEach((s) => (s.p = 100 - s.p)); g.stops.sort((a, b) => a.p - b.p); again(); }));
+
+    box.append(prev, h('div', { class: 'f-lbl grad-sub' }, '빠른 선택'), presets, ...shape, h('div', { class: 'f-lbl grad-sub' }, '색 (' + g.stops.length + '개)'), list, tools);
     return box;
   }
   function toHex6(v) {

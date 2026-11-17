@@ -66,10 +66,31 @@
 
   /* ---------- 그라데이션 색 ----------
      { c: [색1, 색2, 색3?], three: bool, kind: 'linear'|'radial', a: 각도 } */
+  /* 예전 형식 { c:[..], three } → 새 형식 { stops:[{ c, p, o }] } */
+  PF.gradStops = function (g) {
+    if (Array.isArray(g.stops) && g.stops.length) return g.stops;
+    const cs = (g.three ? (g.c || []).slice(0, 3) : (g.c || []).slice(0, 2)).filter(Boolean);
+    if (!cs.length) cs.push('#FFFFFF', '#E6E8EE');
+    if (cs.length === 1) cs.push(cs[0]);
+    return cs.map((c, i) => ({ c, p: Math.round((i / (cs.length - 1)) * 100), o: 1 }));
+  };
+  PF.rgba = function (hex, o = 1) {
+    let h = String(hex || '#000000').replace('#', '');
+    if (h.length === 3) h = h.split('').map((x) => x + x).join('');
+    const n = parseInt(h.slice(0, 6), 16) || 0;
+    const a = h.length === 8 ? (parseInt(h.slice(6, 8), 16) / 255) * o : o;
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${Math.round(a * 1000) / 1000})`;
+  };
+  /* 그라데이션 → CSS
+     { stops:[{ c:색, p:위치%, o:불투명도 }], kind:'linear'|'radial'|'conic', a:각도, x/y:중심%, shape:'circle'|'ellipse' } */
   PF.cssGrad = function (g) {
-    if (!g || !Array.isArray(g.c)) return '';
-    const stops = (g.three ? g.c.slice(0, 3) : g.c.slice(0, 2)).filter(Boolean).join(', ');
-    return g.kind === 'radial' ? `radial-gradient(circle at center, ${stops})` : `linear-gradient(${g.a ?? 135}deg, ${stops})`;
+    if (!g) return '';
+    const st = PF.gradStops(g).slice().sort((a, b) => (a.p ?? 0) - (b.p ?? 0));
+    const stops = st.map((s) => `${PF.rgba(s.c, s.o ?? 1)} ${PF.clamp(s.p ?? 0, 0, 100)}%`).join(', ');
+    const at = `${g.x ?? 50}% ${g.y ?? 50}%`;
+    if (g.kind === 'radial') return `radial-gradient(${g.shape === 'ellipse' ? 'ellipse' : 'circle'} at ${at}, ${stops})`;
+    if (g.kind === 'conic') return `conic-gradient(from ${g.a ?? 0}deg at ${at}, ${stops})`;
+    return `linear-gradient(${g.a ?? 135}deg, ${stops})`;
   };
 
   /* ---------- 상태 ---------- */
