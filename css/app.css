@@ -391,3 +391,10 @@ body.is-dragging { cursor: grabbing; user-select: none; }
 .save-prev img { display: block; width: 100%; height: auto; -webkit-touch-callout: default; user-select: auto; }
 .save-acts { flex-wrap: wrap; }
 .save-acts .btn { flex: 1 1 auto; }
+
+/* 사라진 이미지 찾기 · 보관함에서 고르기 */
+.recover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; max-height: 55vh; overflow: auto; padding: 2px; }
+.recover-item { position: relative; display: flex; flex-direction: column; gap: 4px; border: 1.5px solid var(--ui-line); border-radius: 12px; padding: 6px; background: #fff; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ui-pri); }
+.recover-item img { width: 100%; aspect-ratio: 1; object-fit: contain; background: var(--ui-soft); border-radius: 8px; }
+.recover-item:hover { border-color: var(--ui-pri); }
+.recover-item.on { border-color: var(--ui-ok); color: var(--ui-ok); }

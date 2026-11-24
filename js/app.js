@@ -17,7 +17,6 @@
     PF.renderDesign();
     PF.renderStickerLib();
     PF.refreshRichBar();
-    PF.saveSoon();
   };
 
   async function loadTemplate(key, keep) {
@@ -93,7 +92,7 @@
             const n = prompt('페어틀 이름 (비워두면 페어명을 따라가요)', r.nameAuto ? '' : r.name);
             if (n === null) return;
             const nm = n.trim();
-            if (cur) { PF.meta.nameAuto = !nm; PF.meta.name = nm; await PF.saveNow(); }
+            if (cur) { PF.meta.nameAuto = !nm; PF.meta.name = nm; await PF.saveNow({ metaOnly: true }); }
             else { r.nameAuto = !nm; r.name = nm || '이름 없는 페어틀'; await PF.idb.put('projects', r.id, r); }
             libraryModal();
           } }, '이름'),
@@ -113,17 +112,45 @@
               if (rest.length) await PF.openProject(rest[0].id);
               else { closeModal(); templateModal(true); return; }
             }
-            await PF.cleanupAssets();
             libraryModal();
           } }, '삭제'))));
     });
     modal([
       h('h2', {}, '내 페어틀'),
       h('p', { class: 'muted' }, `이 브라우저에 자동 저장된 페어틀 ${list.length}개. 다른 기기·브라우저로 옮기거나 백업하려면 “저장 파일”을 쓰세요.`),
+      h('div', { class: 'btns' }, h('button', { class: 'btn sm', onclick: () => recoverModal() }, '사라진 이미지 찾기')),
       grid,
       h('div', { class: 'modal-actions' }, h('button', { class: 'btn', onclick: closeModal }, '닫기')),
     ], 'wide');
   }
+
+  /* ---------- 사라진 이미지 되찾기 ----------
+     어떤 페어틀에도 연결되어 있지 않지만 브라우저 저장소에는 남아 있는 이미지를 보여주고,
+     스티커 보관함에 담아 다시 쓸 수 있게 함 (이미지 칸에서도 “보관함에서 고르기”로 넣을 수 있음) */
+  async function recoverModal() {
+    modal([h('h2', {}, '사라진 이미지 찾기'), h('p', { class: 'muted' }, '브라우저 저장소를 살펴보는 중…')], 'wide');
+    const ids = await PF.findOrphanAssets();
+    const lib = PF.project.stickerLib;
+    const grid = h('div', { class: 'recover-grid' });
+    ids.forEach((id) => {
+      const inLib = lib.includes(id);
+      const card = h('button', { class: 'recover-item' + (inLib ? ' on' : ''), title: inLib ? '보관함에 있어요' : '보관함에 담기', onclick: () => {
+        if (!lib.includes(id)) { lib.push(id); PF.commit(); PF.renderStickerLib(); card.classList.add('on'); }
+      } }, h('img', { src: PF.assets[id], alt: '' }), h('span', {}, inLib ? '담김' : '+ 담기'));
+      grid.append(card);
+    });
+    modal([
+      h('h2', {}, '사라진 이미지 찾기'),
+      h('p', { class: 'muted' }, ids.length
+        ? `어떤 페어틀에도 연결되지 않은 이미지 ${ids.length}개를 찾았어요. 눌러서 스티커 보관함에 담으면, 이미지 칸의 “보관함에서 고르기”로 다시 넣을 수 있어요.`
+        : '연결이 끊긴 이미지가 없어요. 이 브라우저 저장소에도 없는 이미지는 저장 파일(.json)로만 되살릴 수 있어요.'),
+      grid,
+      h('div', { class: 'modal-actions' },
+        ids.length ? h('button', { class: 'btn', onclick: () => { ids.forEach((id) => { if (!lib.includes(id)) lib.push(id); }); PF.commit(); PF.renderStickerLib(); recoverModal(); } }, '모두 보관함에 담기') : null,
+        h('button', { class: 'btn', onclick: closeModal }, '닫기')),
+    ], 'wide');
+  }
+  PF.recoverModal = recoverModal;
 
   /* ---------- PNG 내보내기 ---------- */
   function exportModal() {
@@ -203,6 +230,8 @@
   /* ---------- 저장 파일 ---------- */
   function exportJson() {
     const data = { format: FORMAT, version: 1, project: PF.project, assets: PF.usedAssets(true) };
+    const lost = Array.from(PF.assetRefs(PF.project)).filter((id) => !data.assets[id]).length;
+    if (lost) PF.toast(`이미지 ${lost}개는 이 브라우저에 남아 있지 않아 저장 파일에 넣지 못했어요`, 6000);
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     download(url, fileName('pairframe.json'));
@@ -215,7 +244,7 @@
     try {
       const data = JSON.parse(await PF.readFile(file, 'text'));
       if (data.format !== FORMAT || !data.project || !Array.isArray(data.project.rows)) throw new Error('형식 아님');
-      for (const k in data.assets || {}) if (/^data:(image|font|application|binary)\//.test(data.assets[k])) { PF.assets[k] = data.assets[k]; await PF.idb.put('assets', k, data.assets[k]); }
+      for (const k in data.assets || {}) if (/^data:(image|font|application|binary)\//.test(data.assets[k])) { PF.assets[k] = data.assets[k]; await PF.storeAsset(k, data.assets[k]); }
       if (PF.meta) await PF.makeThumb();
       await PF.newProject(PF.deepSanitize(data.project));
       PF.toast('불러온 페어틀을 “내 페어틀”에 추가했어요');
@@ -297,6 +326,7 @@
     'close-text': () => PF.closeTextSheet && PF.closeTextSheet(),
     new: () => templateModal(false),
     library: libraryModal,
+    recover: () => recoverModal(),
     undo: PF.undo,
     redo: PF.redo,
     'zoom-in': () => { PF.ui.zoom = Math.min(3, Math.round((PF.zoomScale + 0.1) * 10) / 10); PF.applyZoom(); },
@@ -324,7 +354,9 @@
   });
   addEventListener('beforeunload', () => PF.saveNow());
   addEventListener('pagehide', () => PF.saveNow());
-  document.addEventListener('visibilitychange', () => { if (document.hidden) PF.saveNow(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) PF.saveNow(); else PF.checkNewer(); });
+  addEventListener('focus', () => PF.checkNewer());
+  addEventListener('pageshow', (e) => { if (e.persisted) PF.checkNewer(); });
 
   /* ---------- 시작 ---------- */
   async function start() {
@@ -335,8 +367,14 @@
     PF.initStickers();
     renderPalette();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    if (!(await PF.idb.ping())) {
+      PF.setStatus('이 브라우저에선 자동 저장이 안 돼요', 'err');
+      setTimeout(() => PF.toast('이 브라우저(앱 안의 브라우저 등)에서는 자동 저장이 막혀 있어요. 사파리·크롬에서 열거나 “저장 파일”로 꼭 백업하세요', 9000), 800);
+    }
+    if (/KAKAOTALK|Instagram|FBAN|FBAV|NAVER\(inapp|Line\/|everytimeApp/i.test(navigator.userAgent)) {
+      setTimeout(() => PF.toast('카카오톡 · 인스타그램 같은 앱 안의 브라우저는 저장된 작업이 지워질 수 있어요. 오른쪽 위 메뉴에서 “다른 브라우저로 열기”를 권해요', 9000), 1500);
+    }
     await PF.migrateOld();
-    for (const { key, value } of await PF.idb.all('assets')) PF.assets[key] = value;
     const cur = await PF.dbGet('current');
     const list = await PF.listProjects();
     const id = list.some((r) => r.id === cur) ? cur : list[0] && list[0].id;

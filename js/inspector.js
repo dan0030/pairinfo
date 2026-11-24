@@ -192,12 +192,27 @@
     box.append(
       h('div', { class: 'img-ctl-top' },
         h('div', { class: 'img-thumb' + (has ? '' : ' empty') }, has ? h('img', { src: PF.assets[ref.id], alt: '' }) : '없음'),
-        h('div', {}, h('div', { class: 'f-lbl' }, img.label + (img.own && img.own.obj['own' + img.own.w] ? ' (이 블록 전용)' : '')), h('div', { class: 'btns' }, btn(has ? '교체' : '올리기', pick), has ? btn('삭제', () => { img.set(null); full(); }, 'danger') : null))));
+        h('div', {}, h('div', { class: 'f-lbl' }, img.label + (img.own && img.own.obj['own' + img.own.w] ? ' (이 블록 전용)' : '')), h('div', { class: 'btns' }, btn(has ? '교체' : '올리기', pick), (PF.project.stickerLib || []).length ? btn('보관함에서', () => pickFromLib(img)) : null, has ? btn('삭제', () => { img.set(null); full(); }, 'danger') : null))));
     if (has) {
       ref.x ??= 50; ref.y ??= 50; ref.zoom ??= 1;
       box.append(row('가로 위치', range(ref, 'x', 0, 100, 1)), row('세로 위치', range(ref, 'y', 0, 100, 1)), row('확대', range(ref, 'zoom', 1, 4, 0.05, null, (v) => v.toFixed(2) + '×')));
     }
     return box;
+  }
+
+  /* 스티커 보관함 이미지를 이미지 칸에 넣기 */
+  function pickFromLib(img) {
+    const lib = (PF.project.stickerLib || []).filter((id) => PF.assets[id]);
+    const m = $('#modal'), c = $('#modal-card');
+    c.className = 'modal-card wide';
+    const close = () => { m.classList.add('hidden'); PF.backPop && PF.backPop(); };
+    c.replaceChildren(
+      h('h2', {}, '보관함에서 고르기'),
+      h('p', { class: 'muted' }, img.label + '에 넣을 이미지를 고르세요.'),
+      h('div', { class: 'recover-grid' }, ...lib.map((id) => h('button', { class: 'recover-item', onclick: () => { img.set({ id, x: 50, y: 50, zoom: 1 }); close(); full(); } }, h('img', { src: PF.assets[id], alt: '' })))),
+      h('div', { class: 'modal-actions' }, h('button', { class: 'btn', onclick: close }, '닫기')));
+    m.classList.remove('hidden');
+    PF.backPush && PF.backPush();
   }
 
   /* ---------- 목록(항목) 관리 ---------- */

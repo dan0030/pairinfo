@@ -158,9 +158,69 @@
     for (const k in PF.assets) if (PF.assets[k] === dataURL) return k;
     const id = 'a' + PF.uid();
     PF.assets[id] = dataURL;
-    PF.idb.put('assets', id, dataURL).catch(() => PF.toast('이미지를 저장할 공간이 부족해요. 안 쓰는 페어틀을 지워 보세요', 5000));
+    PF.storeAsset(id, dataURL);
     flushNext = true;
     return id;
+  };
+
+  /* ---------- 이미지 저장소 ----------
+     값: { b: Blob, t: 저장 시각 }  (예전 값: 글자 그대로의 dataURL, 또는 { s: dataURL }) */
+  function dataURLToBlob(u) {
+    const i = u.indexOf(',');
+    const head = u.slice(5, i), b64 = /;base64/.test(head);
+    const mime = head.split(';')[0] || 'application/octet-stream';
+    const raw = b64 ? atob(u.slice(i + 1)) : decodeURIComponent(u.slice(i + 1));
+    const arr = new Uint8Array(raw.length);
+    for (let k = 0; k < raw.length; k++) arr[k] = raw.charCodeAt(k);
+    return new Blob([arr], { type: mime });
+  }
+  const blobToDataURL = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
+  const pendingAssets = new Set();
+  PF.storeAsset = function (id, dataURL) {
+    const job = (async () => {
+      let ok = false;
+      try { await PF.idb.put('assets', id, { b: dataURLToBlob(dataURL), t: Date.now() }); ok = await PF.idb.has('assets', id); } catch (e) { console.warn('이미지 저장(바이너리) 실패 → 글자로 다시', e); }
+      if (!ok) { try { await PF.idb.put('assets', id, { s: dataURL, t: Date.now() }); ok = await PF.idb.has('assets', id); } catch (e) { console.warn('이미지 저장 실패', e); } }
+      if (!ok) {
+        PF.assetError = true;
+        PF.toast('이미지를 브라우저에 저장하지 못했어요. 저장 공간이 부족하거나 저장이 막힌 브라우저예요. “저장 파일”로 꼭 백업해 주세요', 8000);
+        if (PF.setStatus) PF.setStatus('이미지 저장 실패 — 저장 파일로 백업하세요', 'err');
+      }
+      return ok;
+    })();
+    pendingAssets.add(job);
+    job.finally(() => pendingAssets.delete(job));
+    return job;
+  };
+  PF.waitAssets = () => Promise.all(Array.from(pendingAssets));
+  async function readAsset(v) {
+    if (v == null) return null;
+    if (typeof v === 'string') return v;
+    if (v.s) return v.s;
+    if (v.b) return blobToDataURL(v.b);
+    return null;
+  }
+  /* 페어틀이 쓰는 이미지 번호 모으기 */
+  PF.assetRefs = function (p) {
+    const s = JSON.stringify(p || {});
+    const ids = new Set();
+    for (const m of s.matchAll(/"(?:id|src|img|asset)":"(a[0-9a-z]{4,12})"/g)) ids.add(m[1]);
+    ((p && p.stickerLib) || []).forEach((x) => typeof x === 'string' && ids.add(x));
+    return ids;
+  };
+  /* 필요한 이미지만 하나씩 불러오기 (한꺼번에 읽다 실패하면 전부 비던 문제 방지) */
+  PF.loadAssetsFor = async function (p) {
+    const missing = [];
+    for (const id of PF.assetRefs(p)) {
+      if (PF.assets[id]) continue;
+      let v;
+      for (let tries = 0; tries < 2 && v === undefined; tries++) v = await PF.idb.get('assets', id);
+      try {
+        const d = await readAsset(v);
+        if (d) PF.assets[id] = d; else missing.push(id);
+      } catch (e) { missing.push(id); }
+    }
+    return missing;
   };
 
   PF.pickFile = function (accept, multiple) {
@@ -240,6 +300,7 @@
     if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
     PF.project = JSON.parse(snap);
     PF.afterLoad();
+    PF.saveSoon();
     PF.updateHistBtns();
     PF.toast(msg, 1100);
   }
@@ -307,6 +368,9 @@
     async get(store, k) { try { return await req((await db()).transaction(store).objectStore(store).get(k)); } catch (e) { return undefined; } },
     async put(store, k, v) { try { return await req((await db()).transaction(store, 'readwrite').objectStore(store).put(v, k)); } catch (e) { console.warn('저장 실패', e); throw e; } },
     async del(store, k) { try { return await req((await db()).transaction(store, 'readwrite').objectStore(store).delete(k)); } catch (e) {} },
+    async keys(store) { try { return await req((await db()).transaction(store).objectStore(store).getAllKeys()); } catch (e) { return []; } },
+    async has(store, k) { try { return (await req((await db()).transaction(store).objectStore(store).count(k))) > 0; } catch (e) { return false; } },
+    async ping() { try { await db(); return true; } catch (e) { return false; } },
     async all(store) {
       try {
         const st = (await db()).transaction(store).objectStore(store);
@@ -333,30 +397,124 @@
     el.textContent = t;
     el.className = 'save-status ' + (cls || '');
   }
+  PF.setStatus = setStatus;
   let saveTimer = 0;
   let flushNext = false;
+  let dirty = false; // 이 창에서 고친 내용이 아직 저장 안 됨
+  // 타이핑 중이라 아직 되돌리기 기록에 안 들어간 변경(pending)도 ‘고친 내용’으로 봄
+  const hasEdits = () => dirty || pending;
+  PF.isDirty = hasEdits;
   PF.saveSoon = () => {
     if (!PF.meta) return;
+    dirty = true;
     setStatus('저장 중…', 'busy');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(PF.saveNow, flushNext ? 30 : 700);
     flushNext = false;
   };
-  PF.saveNow = async () => {
+
+  /* 같은 페어틀을 다른 창(탭)이 그 사이 저장했으면 덮어쓰지 않음 */
+  function txSave(rec, baseRev) {
+    return db().then((d) => new Promise((res, rej) => {
+      const tx = d.transaction(['projects', 'kv'], 'readwrite');
+      const st = tx.objectStore('projects');
+      let out = null;
+      const g = st.get(rec.id);
+      g.onsuccess = () => {
+        const cur = g.result;
+        const curRev = cur ? cur.rev || 0 : 0;
+        if (cur && curRev > baseRev) { out = { conflict: true, cur }; return; }
+        rec.rev = curRev + 1;
+        st.put(rec, rec.id);
+        tx.objectStore('kv').put(rec.id, 'current');
+        out = { ok: true, rev: rec.rev };
+      };
+      tx.oncomplete = () => res(out);
+      tx.onerror = () => rej(tx.error);
+      tx.onabort = () => rej(tx.error || new Error('저장 취소됨'));
+    }));
+  }
+  const bc = 'BroadcastChannel' in window ? new BroadcastChannel('pairframe') : null;
+  const tabId = PF.uid();
+  let saving = null;
+
+  /* metaOnly: 썸네일 · 이름처럼 내용이 아닌 것만 바뀐 저장 */
+  PF.saveNow = async (opts = {}) => {
     clearTimeout(saveTimer);
     if (!PF.project || !PF.meta) return;
-    const m = PF.meta;
-    m.name = PF.projectName();
-    const pn = document.getElementById('proj-name');
-    if (pn) pn.textContent = m.name;
-    m.updated = Date.now();
-    try {
-      await PF.idb.put('projects', m.id, Object.assign({}, m, { data: JSON.stringify(PF.project) }));
-      await PF.dbSet('current', m.id);
-      const d = new Date(m.updated);
-      setStatus('자동 저장됨 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'), 'ok');
-    } catch (e) {
-      setStatus('저장 실패 — 저장 공간을 확인하세요', 'err');
+    if (pending) PF.commit(); // 방금 친 글자까지 포함
+    if (!dirty && !opts.force && !opts.metaOnly) return; // 고친 게 없으면 저장하지 않음 (옛 화면이 새 내용을 덮는 일 방지)
+    if (saving) { await saving; if (!dirty && !opts.force && !opts.metaOnly) return; }
+    saving = (async () => {
+      await PF.waitAssets(); // 이미지가 먼저 저장된 다음에 페어틀 저장
+      const m = PF.meta;
+      m.name = PF.projectName();
+      const pn = document.getElementById('proj-name');
+      if (pn) pn.textContent = m.name;
+      const wasDirty = dirty;
+      dirty = false;
+      const { data: _d, ...metaNoData } = m;
+      const rec = Object.assign({}, metaNoData, { updated: Date.now(), data: JSON.stringify(PF.project) });
+      try {
+        const r = await txSave(rec, m.rev || 0);
+        if (r.conflict) {
+          if (!wasDirty) { await PF.reloadCurrent(r.cur); return; } // 이 창엔 고친 게 없으니 새 내용을 받아 옴
+          // 두 창에서 모두 고쳤으면: 저쪽 내용을 지키고, 이 창 내용은 따로 저장
+          m.id = 'p' + PF.uid();
+          m.rev = 0;
+          m.nameAuto = false;
+          m.name = PF.projectName().replace(/ \(이 창에서 고친 버전\)$/, '') + ' (이 창에서 고친 버전)';
+          dirty = true;
+          saving = null;
+          await PF.saveNow({ force: true });
+          PF.toast('다른 창에서도 이 페어틀을 고쳐서, 이 창의 내용은 “' + m.name + '”로 따로 저장했어요', 7000);
+          return;
+        }
+        m.rev = r.rev;
+        m.updated = rec.updated;
+        if (bc) bc.postMessage({ type: 'saved', id: m.id, rev: m.rev, from: tabId });
+        const d = new Date(m.updated);
+        if (!PF.assetError) setStatus('자동 저장됨 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'), 'ok');
+      } catch (e) {
+        console.error('저장 실패', e);
+        dirty = dirty || wasDirty;
+        setStatus('저장 실패 — 저장 공간을 확인하세요', 'err');
+      }
+    })();
+    try { await saving; } finally { saving = null; }
+  };
+
+  /* 다른 창이 저장한 새 내용으로 바꾸기 (이 창에 안 저장된 내용이 없을 때만) */
+  PF.reloadCurrent = async function (rec) {
+    if (!PF.meta) return false;
+    rec = rec || (await PF.idb.get('projects', PF.meta.id));
+    if (!rec || (rec.rev || 0) <= (PF.meta.rev || 0) || hasEdits()) return false;
+    const { data, ...meta } = rec;
+    const project = JSON.parse(data);
+    await PF.loadAssetsFor(project);
+    const zoom = PF.ui.zoom;
+    PF.project = project;
+    PF.meta = meta;
+    if (PF.closeTextSheet) PF.closeTextSheet(true);
+    PF.afterLoad();
+    PF.resetHistory();
+    PF.ui.zoom = zoom;
+    PF.applyZoom && PF.applyZoom();
+    PF.toast('다른 창에서 고친 최신 내용으로 바꿨어요', 3000);
+    return true;
+  };
+  /* 창으로 돌아왔을 때 · 다른 창이 저장했을 때 최신 내용 확인 */
+  PF.checkNewer = async function () {
+    if (!PF.meta || hasEdits()) return;
+    const rec = await PF.idb.get('projects', PF.meta.id);
+    if (rec && (rec.rev || 0) > (PF.meta.rev || 0)) await PF.reloadCurrent(rec);
+  };
+  if (bc) bc.onmessage = (e) => {
+    const m = e.data || {};
+    if (m.from === tabId || !PF.meta || m.id !== PF.meta.id) return;
+    if (m.type === 'saved' && (m.rev || 0) > (PF.meta.rev || 0)) {
+      if (!hasEdits()) PF.reloadCurrent();
+      else PF.toast('다른 창에서도 이 페어틀을 고치고 있어요. 한 창에서만 고쳐 주세요', 5000);
     }
   };
 
@@ -372,7 +530,7 @@
         height: Math.min(f.offsetHeight, f.offsetWidth * 1.25),
         filter: (n) => !(n.classList && n.classList.contains('pf-chrome')),
       });
-      await PF.saveNow();
+      await PF.saveNow({ metaOnly: true });
     } catch (e) { console.warn('썸네일 실패', e); }
     PF.render(true); // 줄여 끼운 이미지를 원래대로
   };
@@ -380,21 +538,26 @@
   /* 새 페어틀을 목록에 추가하고 열기 */
   PF.newProject = async function (project, name) {
     if (PF.meta) await PF.saveNow();
+    await PF.loadAssetsFor(project);
     PF.project = project;
-    PF.meta = { id: 'p' + PF.uid(), name: name || '', nameAuto: !name, created: Date.now(), thumb: null };
+    PF.meta = { id: 'p' + PF.uid(), name: name || '', nameAuto: !name, created: Date.now(), thumb: null, rev: 0 };
     PF.ui.selected = PF.ui.selSticker = null;
     PF.ui.zoom = 'fit';
     PF.afterLoad();
     PF.resetHistory();
-    await PF.saveNow();
+    await PF.saveNow({ force: true });
   };
   PF.openProject = async function (id) {
     const rec = await PF.idb.get('projects', id);
     if (!rec) return false;
     if (PF.meta && PF.meta.id !== id) await PF.saveNow();
     const { data, ...meta } = rec;
-    PF.project = JSON.parse(data);
+    const project = JSON.parse(data);
+    const missing = await PF.loadAssetsFor(project);
+    dirty = false;
+    PF.project = project;
     PF.meta = meta;
+    if (missing.length) setTimeout(() => PF.toast(`이미지 ${missing.length}개를 이 브라우저 저장소에서 찾지 못했어요. 저장 파일(.json)이 있으면 “불러오기”로 되살릴 수 있어요`, 8000), 600);
     PF.ui.selected = PF.ui.selSticker = null;
     PF.ui.zoom = 'fit';
     PF.afterLoad();
@@ -405,14 +568,33 @@
   PF.listProjects = async () => (await PF.idb.all('projects')).map((x) => x.value).sort((a, b) => b.updated - a.updated);
 
   /* 어떤 페어틀도 쓰지 않는 이미지 · 글꼴 정리 */
+  /* 어떤 페어틀에도 연결되지 않은 이미지 (예전에 덮어써져 연결이 끊긴 이미지 포함) */
+  PF.findOrphanAssets = async function () {
+    const recs = await PF.idb.all('projects');
+    const used = new Set();
+    for (const r of recs) { try { PF.assetRefs(JSON.parse(r.value.data)).forEach((x) => used.add(x)); } catch (e) {} }
+    PF.assetRefs(PF.project).forEach((x) => used.add(x));
+    // 사용자 글꼴은 이미지가 아니므로 제외
+    const out = [];
+    for (const k of await PF.idb.keys('assets')) {
+      if (used.has(k)) continue;
+      let d = PF.assets[k];
+      if (!d) { const v = await PF.idb.get('assets', k); try { d = await readAsset(v); } catch (e) { d = null; } }
+      if (d && /^data:image\//.test(d)) { PF.assets[k] = d; out.push(k); }
+    }
+    return out;
+  };
+  /* 직접 지울 때만 사용 */
   PF.cleanupAssets = async function () {
     const recs = await PF.idb.all('projects');
     const all = recs.map((r) => r.value.data).join('\n') + JSON.stringify(PF.project || {});
-    for (const k of Object.keys(PF.assets)) {
-      if (!all.includes('"' + k + '"')) {
-        delete PF.assets[k];
-        PF.idb.del('assets', k);
-      }
+    const keys = new Set([...(await PF.idb.keys('assets')), ...Object.keys(PF.assets)]);
+    for (const k of keys) {
+      if (all.includes('"' + k + '"')) continue;
+      const v = await PF.idb.get('assets', k);
+      if (v && v.t && Date.now() - v.t < 60 * 60 * 1000) continue; // 한 시간 안에 넣은 이미지는 남김
+      delete PF.assets[k];
+      PF.idb.del('assets', k);
     }
   };
 
