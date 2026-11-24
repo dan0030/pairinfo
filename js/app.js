@@ -143,38 +143,50 @@
 
   async function exportPng(scale) {
     const f = PF.frameEl;
-    const prev = { preview: PF.ui.preview, sel: PF.ui.selected, st: PF.ui.selSticker };
+    const prev = { preview: PF.ui.preview, sel: PF.ui.selected, st: PF.ui.selSticker, zoom: PF.ui.zoom };
     PF.ui.preview = true;
     PF.ui.selected = PF.ui.selSticker = null;
     PF.render(true);
     f.classList.add('exporting');
-    PF.toast('이미지를 만드는 중… 글꼴을 포함하느라 몇 초 걸릴 수 있어요', 8000);
-    const opts = { pixelRatio: scale, backgroundColor: PF.project.settings.theme.bg, cacheBust: false, filter: (n) => !(n.classList && n.classList.contains('pf-chrome')) };
-    let url = null;
+    PF.toast('이미지를 만드는 중…', 30000);
+    let out = null;
     try {
-      await document.fonts.ready;
-      url = await htmlToImage.toPng(f, opts);
+      out = await PF.renderPng(f, scale, (msg) => PF.toast(msg, 30000));
     } catch (e) {
-      console.warn('글꼴 포함 실패, 글꼴 없이 다시 시도', e);
-      try {
-        url = await htmlToImage.toPng(f, Object.assign({ skipFonts: true }, opts));
-        PF.toast('웹 글꼴을 포함하지 못해 기본 글꼴로 저장했을 수 있어요', 4000);
-      } catch (e2) {
-        console.error(e2);
-        PF.toast('이미지 저장에 실패했어요. 이미지 수를 줄이거나 배율을 낮춰 보세요.', 5000);
-      }
+      console.error(e);
     }
     f.classList.remove('exporting');
     PF.ui.preview = prev.preview;
     PF.ui.selected = prev.sel;
     PF.ui.selSticker = prev.st;
-    PF.render();
-    if (url) {
-      const blobUrl = URL.createObjectURL(await (await fetch(url)).blob());
-      download(blobUrl, fileName('png'));
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
-      PF.toast('PNG를 저장했어요');
-    }
+    PF.render(); // 캡처용으로 바꿔 끼운 이미지도 원래대로
+    if (!out) return PF.toast('이미지 저장에 실패했어요. 배율을 1배로 낮춰 다시 해 보세요.', 5000);
+    const note = out.ratio < scale ? ` (기기 한도 때문에 ${Math.round(out.ratio * 100) / 100}배로 저장)` : '';
+    const name = fileName('png');
+    if (PF.isMobile() || PF.isIOS) return saveSheet(out.blob, name, note);
+    const url = URL.createObjectURL(out.blob);
+    download(url, name);
+    setTimeout(() => URL.revokeObjectURL(url), 8000);
+    PF.toast('PNG를 저장했어요' + note, note ? 4500 : 2200);
+  }
+
+  /* 휴대폰: 바로 내려받기가 막히거나 ‘파일’ 앱으로만 가는 경우가 많아 저장 방법을 고르게 함 */
+  function saveSheet(blob, name, note) {
+    const url = URL.createObjectURL(blob);
+    const file = new File([blob], name, { type: 'image/png' });
+    const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+    PF.toast('PNG를 만들었어요' + note, 2500);
+    modal([
+      h('h2', {}, 'PNG 저장'),
+      h('p', { class: 'muted' }, canShare ? '“사진에 저장 · 공유”를 누르고 ‘이미지 저장’을 고르면 사진 앱에 들어가요. 아래 이미지를 길게 눌러 저장해도 돼요.' : '“다운로드”를 누르거나, 아래 이미지를 길게 눌러 저장하세요.'),
+      h('div', { class: 'save-prev' }, h('img', { src: url, alt: name })),
+      h('div', { class: 'modal-actions save-acts' },
+        canShare ? h('button', { class: 'btn primary', onclick: async () => {
+          try { await navigator.share({ files: [file], title: name }); } catch (e) { if (e && e.name !== 'AbortError') PF.toast('공유하지 못했어요. 이미지를 길게 눌러 저장해 보세요'); }
+        } }, '사진에 저장 · 공유') : null,
+        h('button', { class: 'btn' + (canShare ? '' : ' primary'), onclick: () => download(url, name) }, '다운로드'),
+        h('button', { class: 'btn', onclick: () => { closeModal(); setTimeout(() => URL.revokeObjectURL(url), 1000); } }, '닫기')),
+    ], 'wide');
   }
 
   function fileName(ext) {
@@ -311,6 +323,7 @@
     else if (e.key === 'Escape' && !inEd) { closeModal(); PF.closeSheets(); fileMenu.classList.add('hidden'); PF.select(null); }
   });
   addEventListener('beforeunload', () => PF.saveNow());
+  addEventListener('pagehide', () => PF.saveNow());
   document.addEventListener('visibilitychange', () => { if (document.hidden) PF.saveNow(); });
 
   /* ---------- 시작 ---------- */

@@ -385,3 +385,9 @@ body.is-dragging { cursor: grabbing; user-select: none; }
 .tp-item { display: grid; place-items: center; min-height: 52px; border: 1px solid var(--ui-line); border-radius: 12px; background: #fff; cursor: pointer; padding: 6px; overflow: hidden; }
 .tp-item:hover { border-color: var(--ui-pri); background: #fafbff; }
 .tp-sample { white-space: nowrap !important; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+/* 휴대폰 PNG 저장 창 */
+.save-prev { max-height: 52vh; overflow: auto; border-radius: 12px; border: 1px solid var(--ui-line); background: var(--ui-soft); text-align: center; }
+.save-prev img { display: block; width: 100%; height: auto; -webkit-touch-callout: default; user-select: auto; }
+.save-acts { flex-wrap: wrap; }
+.save-acts .btn { flex: 1 1 auto; }

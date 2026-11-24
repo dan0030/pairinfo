@@ -122,27 +122,44 @@
   PF.addImageFile = async function (file, maxSide = 1800) {
     const url = await PF.readFile(file);
     if (/gif|svg/.test(file.type)) return PF.addAsset(url);
-    const img = await new Promise((res, rej) => {
-      const i = new Image();
-      i.onload = () => res(i);
-      i.onerror = rej;
-      i.src = url;
-    });
+    let img;
+    try {
+      img = await new Promise((res, rej) => {
+        const i = new Image();
+        i.onload = () => res(i);
+        i.onerror = rej;
+        i.src = url;
+      });
+    } catch (e) {
+      PF.toast('이 이미지 형식은 열 수 없어요. JPG · PNG · WEBP로 바꿔서 올려 주세요', 4000);
+      throw e;
+    }
     const s = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
-    if (s === 1 && file.size < 1.5e6) return PF.addAsset(url);
+    if (s === 1 && file.size < 700e3) return PF.addAsset(url);
     const c = document.createElement('canvas');
-    c.width = Math.round(img.naturalWidth * s);
-    c.height = Math.round(img.naturalHeight * s);
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    const keepAlpha = /png|webp/.test(file.type);
-    return PF.addAsset(keepAlpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9));
+    c.width = Math.max(1, Math.round(img.naturalWidth * s));
+    c.height = Math.max(1, Math.round(img.naturalHeight * s));
+    const g = c.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(img, 0, 0, c.width, c.height);
+    // 투명한 부분이 실제로 있을 때만 PNG 유지
+    let alpha = false;
+    if (/png|webp|gif|avif/.test(file.type)) {
+      try {
+        const d = g.getImageData(0, 0, c.width, c.height).data;
+        const step = Math.max(4, Math.floor(d.length / 4 / 400000) * 4);
+        for (let k = 3; k < d.length; k += step) if (d[k] < 250) { alpha = true; break; }
+      } catch (e) { alpha = true; }
+    }
+    return PF.addAsset(alpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9));
   };
 
   PF.addAsset = function (dataURL) {
     for (const k in PF.assets) if (PF.assets[k] === dataURL) return k;
     const id = 'a' + PF.uid();
     PF.assets[id] = dataURL;
-    PF.idb.put('assets', id, dataURL).catch(() => PF.toast('이미지를 저장할 공간이 부족해요'));
+    PF.idb.put('assets', id, dataURL).catch(() => PF.toast('이미지를 저장할 공간이 부족해요. 안 쓰는 페어틀을 지워 보세요', 5000));
+    flushNext = true;
     return id;
   };
 
@@ -317,11 +334,13 @@
     el.className = 'save-status ' + (cls || '');
   }
   let saveTimer = 0;
+  let flushNext = false;
   PF.saveSoon = () => {
     if (!PF.meta) return;
     setStatus('저장 중…', 'busy');
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(PF.saveNow, 700);
+    saveTimer = setTimeout(PF.saveNow, flushNext ? 30 : 700);
+    flushNext = false;
   };
   PF.saveNow = async () => {
     clearTimeout(saveTimer);
@@ -346,6 +365,8 @@
     if (!PF.meta || !window.htmlToImage || !PF.frameEl) return;
     try {
       const f = PF.frameEl;
+      const ratio = 420 / f.offsetWidth;
+      if (PF.prepareForCapture) await PF.prepareForCapture(f, ratio);
       PF.meta.thumb = await htmlToImage.toJpeg(f, {
         pixelRatio: 420 / f.offsetWidth, quality: 0.72, skipFonts: true, backgroundColor: PF.project.settings.theme.bg,
         height: Math.min(f.offsetHeight, f.offsetWidth * 1.25),
@@ -353,6 +374,7 @@
       });
       await PF.saveNow();
     } catch (e) { console.warn('썸네일 실패', e); }
+    PF.render(true); // 줄여 끼운 이미지를 원래대로
   };
 
   /* 새 페어틀을 목록에 추가하고 열기 */

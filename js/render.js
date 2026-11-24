@@ -114,8 +114,11 @@
       else if (o.ph !== '') el.append(h('span', { class: 'pf-img-ph' }, h('b', {}, '+'), o.ph || '이미지'));
     }
     const upload = async (file) => {
-      if (!file || !/^image\//.test(file.type)) return;
-      const id = await PF.addImageFile(file);
+      if (!file) return;
+      if (file.type && !/^image\//.test(file.type)) return PF.toast('이미지 파일만 넣을 수 있어요');
+      if (!file.type && !/\.(jpe?g|png|webp|gif|avif|heic|heif|bmp)$/i.test(file.name)) return PF.toast('이미지 파일만 넣을 수 있어요');
+      let id;
+      try { id = await PF.addImageFile(file); } catch (e) { return; }
       set({ id, x: 50, y: 50, zoom: 1 });
       PF.commit();
       PF.render();
